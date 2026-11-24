@@ -365,7 +365,7 @@ async function load(fit=true){
     document.title = `${m.symbol} ${fp(price)} · US Stock Tracker`;
     $('#price').innerHTML = `${esc(fp(price))} <small>${esc(m.currency||'USD')}</small>`;
     const ch = price-prev, pc = ch/prev*100;
-    $('#chg').className = sgn(ch); $('#chg').textContent = `${ch>=0?'▲':'▼'} ${(ch>=0?'+':'')}${fp(ch)} (${fpc(pc)}) วันนี้`;
+    $('#chg').className = sgn(ch); $('#chg').textContent = `${ch>=0?'▲':'▼'} ${(ch>=0?'+':'')}${fp(ch)} (${fpc(pc)}) ${open?'วันนี้':'รอบล่าสุด'}`;
     $('#time').textContent = `อัปเดต ${tfmt(m.regularMarketTime,'Asia/Bangkok',{dateStyle:'medium',timeStyle:'short'})} น. (ไทย) · ${new Date(m.regularMarketTime*1000).toLocaleTimeString('en-US',{timeZone:'America/New_York',hour:'numeric',minute:'2-digit'})} NY`;
     const qb = bars(Q), D = bars(Dy);
     const stats = [['เปิด',fp(qb[0]?.open)],['สูงสุดวันนี้',fp(m.regularMarketDayHigh)],['ต่ำสุดวันนี้',fp(m.regularMarketDayLow)],['ปิดก่อนหน้า',fp(prev)],['ปริมาณซื้อขาย',fv(m.regularMarketVolume)],['ช่วง 52 สัปดาห์',`${fp(m.fiftyTwoWeekLow)} – ${fp(m.fiftyTwoWeekHigh)}`]];
