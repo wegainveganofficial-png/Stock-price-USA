@@ -1,4 +1,4 @@
-// Proxy to Yahoo Finance (chart, symbol search, news, batch quotes) + S&P 500 list from Wikipedia for the US Stock Tracker page.
+// Proxy to Yahoo Finance (chart, symbol search, news, batch quotes) + S&P 500 list (Wikipedia) + market caps + Bloomberg RSS headlines + stock-of-the-day screen for the US Stock Tracker page.
 // Thai translation of news is done in the browser (translation services block server IPs).
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36';
 const RANGES = new Set(['1d','5d','1mo','3mo','6mo','1y','2y','5y','max']);
@@ -124,6 +124,97 @@ async function quotes(syms: string[]) {
   return out;
 }
 
+/* ---------- market caps via Yahoo v7 quote (needs cookie + crumb), cached 1h ---------- */
+let crumb: { t: number; cookie: string; crumb: string } | null = null;
+async function getCrumb() {
+  if (crumb && Date.now() - crumb.t < 3600 * 1000) return crumb;
+  const r1 = await fetch('https://fc.yahoo.com/', { headers: { 'User-Agent': UA }, redirect: 'manual' });
+  const raw = r1.headers.get('set-cookie') || '';
+  const cookie = raw.split(/,(?=\s*[A-Za-z0-9_]+=)/).map((c) => c.split(';')[0].trim()).filter(Boolean).join('; ');
+  const r2 = await fetch('https://query2.finance.yahoo.com/v1/test/getcrumb', { headers: { 'User-Agent': UA, Cookie: cookie } });
+  const c = (await r2.text()).trim();
+  if (!c || c.length > 40 || /[<{]/.test(c)) throw new Error('crumb unavailable (HTTP ' + r2.status + ')');
+  crumb = { t: Date.now(), cookie, crumb: c };
+  return crumb;
+}
+const capCache = new Map<string, { t: number; cap: number | null }>();
+async function caps(syms: string[]) {
+  const need = syms.filter((s) => { const c = capCache.get(s); return !c || Date.now() - c.t > 3600 * 1000; });
+  if (need.length) {
+    const k = await getCrumb();
+    const chunks: string[][] = []; for (let i = 0; i < need.length; i += 150) chunks.push(need.slice(i, i + 150));
+    await Promise.all(chunks.map(async (c) => {
+      const r = await fetch(`https://query2.finance.yahoo.com/v7/finance/quote?symbols=${c.map(encodeURIComponent).join(',')}&fields=marketCap&crumb=${encodeURIComponent(k.crumb)}`, { headers: { 'User-Agent': UA, Cookie: k.cookie } });
+      const j: any = await r.json().catch(() => null);
+      if (!j?.quoteResponse) { crumb = null; throw new Error('quote HTTP ' + r.status); }
+      for (const q of j.quoteResponse.result || []) capCache.set(q.symbol, { t: Date.now(), cap: q.marketCap ?? null });
+    }));
+  }
+  return Object.fromEntries(syms.map((s) => [s, capCache.get(s)?.cap ?? null]));
+}
+
+/* ---------- Bloomberg public RSS headlines, cached 10 min ---------- */
+const BBG: Record<string, string> = { markets: 'https://feeds.bloomberg.com/markets/news.rss', technology: 'https://feeds.bloomberg.com/technology/news.rss', economics: 'https://feeds.bloomberg.com/economics/news.rss' };
+const bbgCache = new Map<string, { t: number; items: News[] }>();
+async function bloomberg(feed: string) {
+  const c = bbgCache.get(feed); if (c && Date.now() - c.t < 600000) return c.items;
+  const r = await fetch(BBG[feed], { headers: { 'User-Agent': UA, Accept: 'application/rss+xml, application/xml' } });
+  const x = await r.text();
+  const items = [...x.matchAll(/<item>([\s\S]*?)<\/item>/g)].map((m) => {
+    const g = (t: string) => decode((m[1].match(new RegExp(`<${t}[^>]*>([\\s\\S]*?)</${t}>`)) || [])[1] || '');
+    const t = Date.parse(g('pubDate'));
+    return { title: g('title'), summary: g('description'), link: g('link') || g('guid'), publisher: 'Bloomberg', time: isNaN(t) ? null : Math.floor(t / 1000) };
+  }).filter((n) => n.title && /^https?:\/\//.test(n.link)).sort((a, b) => (b.time || 0) - (a.time || 0)).slice(0, 15);
+  if (!items.length) throw new Error('Bloomberg RSS HTTP ' + r.status);
+  bbgCache.set(feed, { t: Date.now(), items });
+  return items;
+}
+
+/* ---------- Stock of the day: rule-based screen over the S&P 500 (cached 1h) ---------- */
+async function dailyCloses(syms: string[]) {
+  const out: Record<string, number[]> = {};
+  const chunks: string[][] = []; for (let i = 0; i < syms.length; i += 20) chunks.push(syms.slice(i, i + 20));
+  for (let i = 0; i < chunks.length; i += 6) {
+    await Promise.all(chunks.slice(i, i + 6).map(async (c) => {
+      const r = await yget(`/v8/finance/spark?symbols=${c.map(encodeURIComponent).join(',')}&range=6mo&interval=1d`);
+      if (!r.ok) return; const j: any = r.j;
+      if (j.spark?.result) { for (const it of j.spark.result) { const q = it.response?.[0]?.indicators?.quote?.[0]?.close; if (q) out[it.symbol] = q.filter((x: any) => x != null); } }
+      else for (const [k, v] of Object.entries<any>(j)) if (Array.isArray(v?.close)) out[k] = v.close.filter((x: any) => x != null);
+    }));
+  }
+  return out;
+}
+const avg = (a: number[]) => a.reduce((x, y) => x + y, 0) / a.length;
+function rsi14(c: number[]) {
+  let g = 0, l = 0; for (let i = 1; i <= 14; i++) { const d = c[i] - c[i - 1]; d > 0 ? (g += d) : (l -= d); }
+  g /= 14; l /= 14;
+  for (let i = 15; i < c.length; i++) { const d = c[i] - c[i - 1]; g = (g * 13 + Math.max(d, 0)) / 14; l = (l * 13 + Math.max(-d, 0)) / 14; }
+  return l === 0 ? 100 : 100 - 100 / (1 + g / l);
+}
+let pickCache: { t: number; data: unknown } | null = null;
+async function stockOfDay() {
+  if (pickCache && Date.now() - pickCache.t < 3600 * 1000) return pickCache.data;
+  const list = await sp500(); const meta = Object.fromEntries(list.map((m) => [m.symbol, m]));
+  const closes = await dailyCloses(list.map((m) => m.symbol));
+  const rows: any[] = [];
+  for (const [sym, c] of Object.entries(closes)) {
+    if (c.length < 60) continue;
+    const n = c.length, p = c[n - 1], sma20 = avg(c.slice(-20)), sma50 = avg(c.slice(-50)), rsi = rsi14(c);
+    const ret20 = p / c[n - 21] - 1, ret5 = p / c[n - 6] - 1, chg = p / c[n - 2] - 1;
+    const rets = c.slice(-21).map((v, i, a) => i ? v / a[i - 1] - 1 : 0).slice(1);
+    const sd = Math.sqrt(avg(rets.map((r) => (r - avg(rets)) ** 2))) * Math.sqrt(20);
+    const hi60 = Math.max(...c.slice(-60)), dist = p / hi60 - 1;
+    const pass = p > sma20 && sma20 > sma50 && rsi >= 50 && rsi <= 70 && ret20 > 0 && chg > -0.03;
+    const score = ret20 / (sd || 1) + (dist > -0.03 ? 0.5 : 0) + (chg > 0 ? 0.2 : 0);
+    rows.push({ symbol: sym, name: meta[sym]?.name, sector: meta[sym]?.sector, price: p, chg, rsi, sma20, sma50, ret20, ret5, vol20: sd, dist, score, pass });
+  }
+  const passed = rows.filter((r) => r.pass).sort((a, b) => b.score - a.score);
+  const data = { asOf: Date.now(), universe: rows.length, passed: passed.length, pick: passed[0] || null, runners: passed.slice(1, 5),
+    method: 'Filter: price > SMA20 > SMA50, RSI(14) 50-70, 20-day return > 0, day change > -3%. Rank: 20-day return / 20-day volatility, +0.5 if within 3% of 60-day high, +0.2 if up on the day.' };
+  pickCache = { t: Date.now(), data };
+  return data;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   const u = new URL(req.url);
@@ -140,6 +231,21 @@ Deno.serve(async (req) => {
     return json({ quotes }, 200, { 'Cache-Control': 'max-age=300' });
   }
 
+  if (type === 'caps') {
+    const syms = [...new Set((u.searchParams.get('symbols') || '').toUpperCase().split(',').map((x) => x.trim()).filter((x) => SYM.test(x)))].slice(0, 600);
+    try { return json({ caps: await caps(syms) }, 200, { 'Cache-Control': 'max-age=1800' }); }
+    catch (e) { return json({ error: (e as Error).message, caps: {} }, 502); }
+  }
+  if (type === 'bloomberg') {
+    const feed = u.searchParams.get('feed') || 'markets';
+    if (!BBG[feed]) return json({ error: 'unknown feed' }, 400);
+    try { return json({ feed, items: await bloomberg(feed) }, 200, { 'Cache-Control': 'max-age=300' }); }
+    catch (e) { return json({ error: (e as Error).message, items: [] }, 502); }
+  }
+  if (type === 'pick') {
+    try { return json(await stockOfDay(), 200, { 'Cache-Control': 'max-age=900' }); }
+    catch (e) { return json({ error: (e as Error).message }, 502); }
+  }
   if (type === 'sp500') {
     try { return json({ updated: spCache?.t ?? Date.now(), members: await sp500() }, 200, { 'Cache-Control': 'max-age=3600' }); }
     catch (e) { return json({ error: (e as Error).message, members: [] }, 502); }

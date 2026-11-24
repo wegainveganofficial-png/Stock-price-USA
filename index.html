@@ -84,6 +84,29 @@ h1{margin:4px 0 0;font-size:clamp(24px,3.4vw,40px);line-height:1.05;text-wrap:ba
 .sec .v{text-align:right;font-variant-numeric:tabular-nums}
 .wi .sx{display:block;font-size:12px;color:var(--mute)}
 @media(max-width:900px){.wl{max-height:70vh}}
+.heat{margin-top:20px}
+.hmbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-bottom:10px}
+#hm{position:relative;height:clamp(420px,62vh,640px);background:#1b262c;border-radius:10px;overflow:hidden}
+#hm .sc{position:absolute;box-shadow:inset 0 0 0 1px #0d161b}
+#hm .sl{position:absolute;left:0;right:0;top:0;height:18px;padding:0 6px;font-size:12px;font-weight:600;color:#e8eef0;background:#0d161b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:18px}
+#hm .tl{position:absolute;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;border:1px solid #0d161b;cursor:pointer;overflow:hidden;text-align:center;line-height:1.1;padding:1px}
+#hm .tl:hover{outline:2px solid #fff;outline-offset:-2px;z-index:2}
+#hm .tl b{font-weight:700;text-shadow:0 1px 2px #0006}#hm .tl span{opacity:.92;font-variant-numeric:tabular-nums}
+.legend{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--mute)}
+.legend i{display:block;width:160px;height:10px;border-radius:5px;background:linear-gradient(90deg,#d63a3a,#414e55 50%,#14a35a)}
+#hmtip{position:fixed;z-index:30;pointer-events:none;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px;box-shadow:0 8px 24px #0004;max-width:260px}
+#hmtip[hidden]{display:none}
+.sotd{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:18px 28px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin-bottom:22px;box-shadow:inset 4px 0 0 var(--acc)}
+.sotd .kick{font-size:13px;color:var(--acc);font-weight:600;margin:0}
+.sotd h2{font-size:clamp(24px,3vw,34px);line-height:1.05;margin:4px 0 2px}
+.sotd .px2{display:flex;gap:12px;align-items:baseline;flex-wrap:wrap;margin:8px 0}
+.sotd .px2 b{font-size:28px;font-variant-numeric:tabular-nums}
+.sotd ul{margin:0;padding-left:18px;font-size:15px}.sotd li{margin:3px 0}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.chip{border:1px solid var(--line);background:var(--bg);border-radius:99px;padding:0 12px;height:36px;cursor:pointer;font-size:14px;white-space:nowrap}
+.btn{border:0;border-radius:10px;background:var(--ink);color:var(--bg);padding:0 16px;height:44px;cursor:pointer;font-weight:600}
+.sotd details{font-size:13px;color:var(--mute);margin-top:8px}
+@media(max-width:700px){.sotd{grid-template-columns:minmax(0,1fr)}}
 #legend{position:absolute;z-index:3;left:12px;top:8px;font-size:13px;pointer-events:none;display:flex;gap:10px;flex-wrap:wrap;background:color-mix(in srgb,var(--panel) 80%,transparent);padding:2px 6px;border-radius:6px}
 #err{position:absolute;z-index:4;inset:0;display:grid;place-items:center;text-align:center;padding:24px;background:var(--panel);color:var(--down)}
 #err[hidden]{display:none}
@@ -134,6 +157,7 @@ footer{max-width:1320px;margin:0 auto;padding:8px max(4vw,16px) 40px;font-size:1
 
 <main class="wrap">
   <section>
+    <div class="sotd" id="sotd"><p class="mute" style="margin:0">กำลังคัดหุ้นเด่นประจำวันจาก S&amp;P 500…</p></div>
     <div class="head">
       <div>
         <div class="symrow"><span id="sym">–</span><span id="exch" class="tag"></span><span id="mkt" class="tag"></span><button id="star" type="button"></button></div>
@@ -181,9 +205,27 @@ footer{max-width:1320px;margin:0 auto;padding:8px max(4vw,16px) 40px;font-size:1
         <div id="tvta"></div>
       </div>
     </div>
+    <div class="card heat">
+      <div class="hmbar">
+        <div><h2>Heat map S&amp;P 500</h2><p class="mute small" id="hmnote" style="margin:0">ขนาดกล่อง = มูลค่าตลาด · สี = % เปลี่ยนแปลงรอบล่าสุด · กดที่กล่องเพื่อดูกราฟหุ้น</p></div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <div class="seg" id="hmsize"><button type="button" data-z="cap">ตามมูลค่าตลาด</button><button type="button" data-z="eq">ขนาดเท่ากัน</button></div>
+          <span class="legend">−3% <i></i> +3%</span>
+        </div>
+      </div>
+      <div id="hm"><p class="mute" style="padding:16px;color:#cfd8dc">กำลังโหลด heat map…</p></div>
+    </div>
+    <div id="hmtip" hidden></div>
     <div class="card news">
       <div class="nhead"><h2>ข่าวล่าสุด <span id="nsym"></span></h2><span class="mute small">แปลเป็นภาษาไทยอัตโนมัติ · ต้นฉบับภาษาอังกฤษจาก Yahoo Finance</span></div>
       <div id="news" class="nlist"></div>
+    </div>
+    <div class="card news">
+      <div class="nhead"><h2>หัวข่าว Bloomberg</h2>
+        <div class="seg" id="bbgf"><button type="button" data-f="markets">ตลาด</button><button type="button" data-f="technology">เทคโนโลยี</button><button type="button" data-f="economics">เศรษฐกิจ</button></div>
+      </div>
+      <p class="mute small" style="margin:0 0 6px">จาก RSS สาธารณะของ Bloomberg แปลเป็นไทยอัตโนมัติ · กดหัวข่าวเพื่ออ่านต้นฉบับที่ bloomberg.com (บางบทความต้องสมัครสมาชิก)</p>
+      <div id="bbg" class="nlist"></div>
     </div>
   </section>
 
@@ -203,7 +245,7 @@ footer{max-width:1320px;margin:0 auto;padding:8px max(4vw,16px) 40px;font-size:1
     <p class="mute small">ราคาอัปเดตทุก 60 วินาที · กราฟหลักทุก 30 วินาที · ข่าวทุก 10 นาที</p>
   </aside>
 </main>
-<footer>ข้อมูลราคาจาก Yahoo Finance (finance.yahoo.com) ดึงผ่าน Supabase Edge Function · กราฟและสัญญาณเทคนิคแท็บ TradingView เป็นวิดเจ็ตทางการจาก <a href="https://www.tradingview.com" style="color:inherit">tradingview.com</a> · ราคาอาจล่าช้าได้ เวลาแสดงตามเวลาตลาดนิวยอร์กบนกราฟ · แนวรับแนวต้านคำนวณอัตโนมัติ ใช้ประกอบการวิเคราะห์เท่านั้น ไม่ใช่คำแนะนำการลงทุน</footer>
+<footer>ข้อมูลราคาจาก Yahoo Finance (finance.yahoo.com) ดึงผ่าน Supabase Edge Function · หัวข่าว Bloomberg จาก RSS สาธารณะ · รายชื่อ S&amp;P 500 จาก Wikipedia · กราฟและสัญญาณเทคนิคแท็บ TradingView เป็นวิดเจ็ตทางการจาก <a href="https://www.tradingview.com" style="color:inherit">tradingview.com</a> · ราคาอาจล่าช้าได้ เวลาแสดงตามเวลาตลาดนิวยอร์กบนกราฟ · แนวรับแนวต้านคำนวณอัตโนมัติ ใช้ประกอบการวิเคราะห์เท่านั้น ไม่ใช่คำแนะนำการลงทุน</footer>
 
 <script>
 {
@@ -499,6 +541,23 @@ async function translateAll(texts){
 }
 const ago = s => { if(!s) return ''; const d=Date.now()/1000-s; return d<3600?Math.max(1,Math.round(d/60))+' นาทีที่แล้ว':d<86400?Math.round(d/3600)+' ชั่วโมงที่แล้ว':Math.round(d/86400)+' วันที่แล้ว'; };
 const safeUrl = u => /^https?:\/\//i.test(u||'') ? u : '#';
+function newsHTML(n){
+  const th=trMem.get(n.title), sm=n.summary?(trMem.get(n.summary)||n.summary):'';
+  return `<article class="ni"><a href="${esc(safeUrl(n.link))}" target="_blank" rel="noopener">${esc(th||n.title)}</a>${sm?`<p style="margin:6px 0 0">${esc(sm)}</p>`:''}${th?`<p class="en">${esc(n.title)}</p>`:''}<div class="meta"><span class="pub">${esc(n.publisher)}</span><span>${esc(ago(n.time))}</span>${n.time?`<span>${esc(tfmt(n.time,'Asia/Bangkok',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}))} น.</span>`:''}</div></article>`;
+}
+let bbgFeed = store.get('bbg','markets');
+async function loadBBG(){
+  document.querySelectorAll('#bbgf button').forEach(x=>x.classList.toggle('on',x.dataset.f===bbgFeed));
+  const f = bbgFeed;
+  try{
+    const j = await (await api('type=bloomberg&feed='+f)).json();
+    if (j.error && !(j.items||[]).length) throw new Error(j.error);
+    const it = j.items || [];
+    await translateAll(it.flatMap(n=>[n.title,n.summary]));
+    if (f===bbgFeed) $('#bbg').innerHTML = it.length ? it.map(newsHTML).join('') : '<p class="mute">ยังไม่มีหัวข่าว</p>';
+  }catch(e){ if (f===bbgFeed) $('#bbg').innerHTML = `<p class="dnc">โหลดหัวข่าว Bloomberg ไม่สำเร็จ: ${esc(e.message)}</p>`; }
+}
+$('#bbgf').addEventListener('click',e=>{const f=e.target.closest('button')?.dataset.f; if(!f)return; bbgFeed=f; store.set('bbg',f); $('#bbg').innerHTML='<p class="mute">กำลังโหลด…</p>'; loadBBG();});
 let newsFor = '', newsName = '';
 async function loadNews(force){
   if (!force && newsFor===sym) return;
@@ -511,8 +570,7 @@ async function loadNews(force){
     if (!it.length){ $('#news').innerHTML = '<p class="mute">ยังไม่มีข่าวล่าสุดของหุ้นตัวนี้</p>'; return; }
     await translateAll(it.flatMap(n=>[n.title,n.summary]));
     if (s!==sym) return;
-    $('#news').innerHTML = it.map(n=>{ const th=trMem.get(n.title), sm=n.summary?(trMem.get(n.summary)||n.summary):'';
-      return `<article class="ni"><a href="${esc(safeUrl(n.link))}" target="_blank" rel="noopener">${esc(th||n.title)}</a>${sm?`<p style="margin:6px 0 0">${esc(sm)}</p>`:''}${th?`<p class="en">${esc(n.title)}</p>`:''}<div class="meta"><span class="pub">${esc(n.publisher)}</span><span>${esc(ago(n.time))}</span>${n.time?`<span>${esc(tfmt(n.time,'Asia/Bangkok',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}))} น.</span>`:''}</div></article>`; }).join('');
+    $('#news').innerHTML = it.map(newsHTML).join('');
   }catch(e){ if (s===sym) $('#news').innerHTML = `<p class="dnc">โหลดข่าวไม่สำเร็จ: ${esc(e.message)}</p>`; }
 }
 
@@ -575,15 +633,110 @@ async function loadSP(){
     $('#spsec').innerHTML = '<option value="">ทุกกลุ่มอุตสาหกรรม</option>' + secs.map(s=>`<option value="${esc(s)}">${esc(SECTOR_TH[s]||s)}</option>`).join('');
   }catch(e){ $('#gsum').textContent = 'โหลดรายชื่อ S&P 500 ไม่สำเร็จ: '+e.message; }
 }
-async function refreshWatch(){
-  if (group==='sp500') await loadSP();
-  const L = glist(), chunks=[]; for (let i=0;i<L.length;i+=100) chunks.push(L.slice(i,i+100));
+const wqT = {};
+async function quotesFor(L){
+  const need = L.filter(s=>!wqT[s] || Date.now()-wqT[s] > 30000), chunks=[];
+  for (let i=0;i<need.length;i+=100) chunks.push(need.slice(i,i+100));
   await Promise.allSettled(chunks.map(async c=>{
     const j = await (await api('type=quotes&symbols='+c.map(encodeURIComponent).join(','))).json();
-    for (const q of j.quotes||[]) wq[q.symbol] = q;
+    const now = Date.now(); for (const q of j.quotes||[]){ wq[q.symbol] = q; wqT[q.symbol] = now; }
   }));
+}
+async function refreshWatch(){
+  if (group==='sp500') await loadSP();
+  await quotesFor(glist());
   renderWatch();
 }
+
+/* ---------- stock of the day (rule-based screen, computed on the server) ---------- */
+async function loadPick(){
+  try{
+    const j = await (await api('type=pick')).json();
+    if (j.error) throw new Error(j.error);
+    const x = j.pick;
+    if (!x){ $('#sotd').innerHTML = `<div><p class="kick">หุ้นเด่นประจำวัน</p><p>วันนี้ไม่มีหุ้นใน S&amp;P 500 ที่ผ่านเกณฑ์ทั้งหมด (ตรวจ ${j.universe} ตัว)</p></div>`; return; }
+    const pc = v => (v>=0?'+':'')+(v*100).toFixed(1)+'%';
+    $('#sotd').innerHTML = `<div>
+        <p class="kick">หุ้นเด่นประจำวัน · สัญญาณทางเทคนิคจากระบบ</p>
+        <h2>${esc(x.symbol)} <span class="mute" style="font-size:.55em;font-weight:400">${esc(x.name||'')}</span></h2>
+        <div class="mute small">${esc(SECTOR_TH[x.sector]||x.sector||'')} · คัดจาก ${j.passed} ตัวที่ผ่านเกณฑ์ จาก ${j.universe} ตัวใน S&amp;P 500</div>
+        <div class="px2"><b>${fp(x.price)}</b><span class="mute">USD</span><span class="${sgn(x.chg)}" style="font-weight:600">${x.chg>=0?'▲':'▼'} ${pc(x.chg)} รอบล่าสุด</span></div>
+        <button type="button" class="btn" data-s="${esc(x.symbol)}">ดูกราฟ แนวรับแนวต้าน และข่าว</button>
+      </div>
+      <div>
+        <p class="kick" style="color:var(--ink)">เหตุผลที่ระบบเลือก</p>
+        <ul>
+          <li>แนวโน้มขาขึ้นเรียงตัว: ราคา ${fp(x.price)} &gt; SMA20 ${fp(x.sma20)} &gt; SMA50 ${fp(x.sma50)}</li>
+          <li>โมเมนตัม 20 วัน <b class="${sgn(x.ret20)}">${pc(x.ret20)}</b> เมื่อเทียบกับความผันผวนแล้วสูงสุดในกลุ่มที่ผ่านเกณฑ์</li>
+          <li>RSI(14) ${x.rsi.toFixed(1)}: แรงซื้อดี แต่ยังไม่เกิน 70 (ไม่ร้อนแรงเกินไป)</li>
+          <li>ห่างจุดสูงสุด 60 วัน ${pc(x.dist)}${x.dist>-0.03?' ใกล้ทำจุดสูงใหม่':''} · 5 วัน ${pc(x.ret5)}</li>
+        </ul>
+        <div class="chips"><span class="small mute" style="align-self:center">อันดับรอง:</span>${(j.runners||[]).map(r=>`<button type="button" class="chip" data-s="${esc(r.symbol)}">${esc(r.symbol)} <span class="${sgn(r.ret20)}">${pc(r.ret20)}</span></button>`).join('')}</div>
+        <details><summary>วิธีคัดเลือก</summary>เกณฑ์: ราคา &gt; SMA20 &gt; SMA50, RSI(14) อยู่ระหว่าง 50–70, ผลตอบแทน 20 วันเป็นบวก, รอบล่าสุดไม่ลงเกิน 3% · จัดอันดับด้วยผลตอบแทน 20 วัน ÷ ความผันผวน 20 วัน (+0.5 ถ้าห่างจุดสูงสุด 60 วันไม่เกิน 3%, +0.2 ถ้ารอบล่าสุดเป็นบวก) · ใช้ราคาปิดรายวัน 6 เดือนจาก Yahoo Finance คำนวณใหม่ทุก 1 ชั่วโมง (${esc(tfmt(Math.floor(j.asOf/1000),'Asia/Bangkok',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}))} น.) · เป็นสัญญาณทางเทคนิคล้วน ไม่ได้ดูปัจจัยพื้นฐาน ไม่ใช่คำแนะนำการลงทุน</details>
+      </div>`;
+  }catch(e){ $('#sotd').innerHTML = `<p class="dnc" style="margin:0">คัดหุ้นเด่นประจำวันไม่สำเร็จ: ${esc(e.message)}</p>`; }
+}
+$('#sotd').addEventListener('click',e=>{const b=e.target.closest('[data-s]'); if(b) select(b.dataset.s);});
+
+/* ---------- heat map (squarified treemap) ---------- */
+let CAPS = {}, hmSize = store.get('hmsize','cap');
+function squarify(items, x, y, w, h){
+  const out=[], rest=items.filter(i=>i.v>0).sort((a,b)=>b.v-a.v), total=rest.reduce((a,b)=>a+b.v,0);
+  if (!total || w<=0 || h<=0) return out;
+  const k=(w*h)/total; let X=x,Y=y,W=w,H=h;
+  while (rest.length){
+    const side=Math.min(W,H); let row=[], best=Infinity, sum=0;
+    while (rest.length){
+      const a=rest[0].v*k, s=sum+a, mx=Math.max(a,...row.map(r=>r.v*k)), mn=Math.min(a,...row.map(r=>r.v*k));
+      const worst=Math.max(side*side*mx/(s*s), (s*s)/(side*side*mn));
+      if (worst<=best){ row.push(rest.shift()); best=worst; sum=s; } else break;
+    }
+    if (W>=H){ const cw=sum/H; let yy=Y; for (const r of row){ const rh=r.v*k/cw; out.push({...r,x:X,y:yy,w:cw,h:rh}); yy+=rh; } X+=cw; W-=cw; }
+    else { const rh=sum/W; let xx=X; for (const r of row){ const rw=r.v*k/rh; out.push({...r,x:xx,y:Y,w:rw,h:rh}); xx+=rw; } Y+=rh; H-=rh; }
+  }
+  return out;
+}
+const mixHex=(a,b,t)=>'#'+[0,2,4].map(i=>Math.round(parseInt(a.slice(1+i,3+i),16)*(1-t)+parseInt(b.slice(1+i,3+i),16)*t).toString(16).padStart(2,'0')).join('');
+const heatCol = c => c==null ? '#5b666c' : mixHex('#414e55', c>=0?'#14a35a':'#d63a3a', Math.min(1,Math.abs(c)/3));
+const fcap = v => v ? '$'+new Intl.NumberFormat('en-US',{notation:'compact',maximumFractionDigits:2}).format(v) : '–';
+function drawHeat(){
+  const box=$('#hm'); if (!SP.length) return;
+  const W=box.clientWidth, H=box.clientHeight; if (!W||!H) return;
+  const val = s => hmSize==='eq' ? 1 : (CAPS[s] || 0);
+  const secs={}; for (const m of SP){ const v=val(m.symbol); if(v>0) (secs[m.sector] ||= []).push({s:m.symbol,v}); }
+  const sr = squarify(Object.entries(secs).map(([k,a])=>({sec:k,v:a.reduce((x,y)=>x+y.v,0),a})),0,0,W,H);
+  let html='';
+  for (const r of sr){
+    const head = r.h>40 && r.w>50 ? 18 : 0, chs=r.a.map(t=>chgOf(t.s)).filter(v=>v!=null), avg=chs.length?chs.reduce((a,b)=>a+b,0)/chs.length:null;
+    html += `<div class="sc" style="left:${r.x}px;top:${r.y}px;width:${r.w}px;height:${r.h}px">${head?`<div class="sl" title="${esc(r.sec)}">${esc(SECTOR_TH[r.sec]||r.sec)}${avg!=null?` ${fpc(avg)}`:''}</div>`:''}</div>`;
+    for (const t of squarify(r.a, r.x, r.y+head, r.w, r.h-head)){
+      const c=chgOf(t.s), fs=Math.max(9,Math.min(22,Math.sqrt(t.w*t.h)/5));
+      const lab = t.w>30 && t.h>18 ? `<b style="font-size:${fs}px">${esc(t.s)}</b>${t.h>fs*2.4&&t.w>40?`<span style="font-size:${Math.max(9,fs*.7)}px">${c==null?'':fpc(c)}</span>`:''}` : '';
+      html += `<div class="tl" data-s="${esc(t.s)}" style="left:${t.x}px;top:${t.y}px;width:${t.w}px;height:${t.h}px;background:${heatCol(c)}">${lab}</div>`;
+    }
+  }
+  box.innerHTML = html;
+}
+async function loadHeat(){
+  try{
+    await loadSP(); if (!SP.length) throw new Error('ไม่มีรายชื่อ S&P 500');
+    const syms = SP.map(m=>m.symbol);
+    const capP = Object.keys(CAPS).length ? null : api('type=caps&symbols='+syms.join(',')).then(r=>r.json()).then(j=>{ CAPS=j.caps||{}; if(!Object.values(CAPS).some(Boolean)){ hmSize='eq'; } });
+    await Promise.all([quotesFor(syms), capP]);
+    document.querySelectorAll('#hmsize button').forEach(x=>x.classList.toggle('on',x.dataset.z===hmSize));
+    drawHeat(); if (group==='sp500') renderWatch();
+  }catch(e){ $('#hm').innerHTML = `<p style="padding:16px;color:#ffb4b4">โหลด heat map ไม่สำเร็จ: ${esc(e.message)}</p>`; }
+}
+$('#hmsize').addEventListener('click',e=>{const z=e.target.closest('button')?.dataset.z; if(!z)return; hmSize=z; store.set('hmsize',z); document.querySelectorAll('#hmsize button').forEach(x=>x.classList.toggle('on',x.dataset.z===z)); drawHeat();});
+$('#hm').addEventListener('click',e=>{const t=e.target.closest('[data-s]'); if(t){ select(t.dataset.s); scrollTo({top:0,behavior:'smooth'}); }});
+$('#hm').addEventListener('mousemove',e=>{
+  const t=e.target.closest('[data-s]'), tip=$('#hmtip'); if(!t){tip.hidden=true;return}
+  const s=t.dataset.s, m=SPMAP[s], q=wq[s], c=chgOf(s);
+  tip.innerHTML = `<b>${esc(s)}</b> ${esc(m?.name||'')}<br>${esc(SECTOR_TH[m?.sector]||m?.sector||'')} · ${esc(m?.industry||'')}<br>ราคา <b>${fp(q?.price)}</b> <span class="${c==null?'':sgn(c)}">${c==null?'':fpc(c)}</span><br>มูลค่าตลาด ${fcap(CAPS[s])}`;
+  tip.hidden=false; const x=Math.min(e.clientX+14, innerWidth-tip.offsetWidth-8), y=Math.min(e.clientY+14, innerHeight-tip.offsetHeight-8); tip.style.left=x+'px'; tip.style.top=y+'px';
+});
+$('#hm').addEventListener('mouseleave',()=>{$('#hmtip').hidden=true});
+const hmRO = new ResizeObserver(()=>drawHeat()); hmRO.observe($('#hm'));
 
 /* ---------- start ---------- */
 syncBtns();
@@ -597,6 +750,10 @@ addEventListener('hashchange',()=>{const s=decodeURIComponent(location.hash.slic
 setInterval(()=>{ if(!document.hidden && ok) load(false); },30000);
 setInterval(()=>{ if(!document.hidden) refreshWatch(); },60000);
 setInterval(()=>{ if(!document.hidden) loadNews(true); },600000);
+loadHeat(); loadBBG(); loadPick();
+setInterval(()=>{ if(!document.hidden) loadPick(); },3600000);
+setInterval(()=>{ if(!document.hidden) loadHeat(); },60000);
+setInterval(()=>{ if(!document.hidden) loadBBG(); },600000);
 }
 </script>
 </body>
