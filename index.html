@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>US Stock Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;600&family=Overpass:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+/* VOICE: a calm market desk — figures first, no noise
+   IDEA: a survey chart of price terrain; support/resistance are contour lines
+   PICTURE: the large candlestick + volume chart with S/R levels drawn across it
+   COLOUR and TYPE: land #fbfbf2, ink #13242e, contour brown for levels, green up / red down; Overpass + IBM Plex Sans Thai
+   LAYOUT: chart-led main column, watchlist panel like a map legend on the right; stacks below 900px */
+:root{color-scheme:light dark;
+--bg:light-dark(#fbfbf2,#0d1c24);--panel:light-dark(#ffffff,#122631);--ink:light-dark(#13242e,#e4edf0);--mute:light-dark(#5a6a72,#8ea2aa);
+--line:light-dark(#e4e3d6,#1f3540);--sea:light-dark(#bfe3ee,#143c4a);--up:light-dark(#0f9957,#34c983);--down:light-dark(#d33434,#ff6464);
+--sr:light-dark(#a8551b,#e08a4c);--acc:light-dark(#d6127e,#ff5aa9);--ma1:light-dark(#2b72c9,#6aa8f0);--ma2:light-dark(#8a5cc2,#b88ef0)}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 Overpass,"IBM Plex Sans Thai",system-ui,sans-serif;overflow-x:clip}
+button,input{font:inherit;color:inherit}
+.num,.big,td.r{font-variant-numeric:tabular-nums}
+.mute{color:var(--mute)}.small{font-size:13px}
+.top{display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:14px max(4vw,16px);background:var(--sea)}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:18px}
+.brand small{font-weight:400;font-size:14px;color:var(--mute)}
+.search{position:relative;flex:1 1 260px;max-width:420px}
+.search input{width:100%;height:44px;border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:0 14px;font-size:16px}
+.search input:focus-visible,button:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+#sug{position:absolute;z-index:20;left:0;right:0;top:48px;margin:0;padding:4px;list-style:none;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 30px #0003}
+#sug li{display:flex;gap:10px;align-items:baseline;padding:10px;border-radius:8px;cursor:pointer}
+#sug li:hover,#sug li.on{background:var(--sea)}
+#sug b{min-width:64px}#sug span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wrap{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:24px;max-width:1320px;margin:0 auto;padding:24px max(4vw,16px)}
+.head{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;align-items:flex-end}
+.symrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+#sym{font-weight:800;font-size:20px}
+.tag{font-size:13px;padding:2px 8px;border-radius:99px;background:var(--sea)}
+.tag.open{background:var(--up);color:#fff}
+#star{height:32px;border:1px solid var(--line);background:var(--panel);border-radius:99px;padding:0 12px;cursor:pointer;font-size:13px}
+h1{margin:4px 0 0;font-size:clamp(24px,3.4vw,40px);line-height:1.05;text-wrap:balance}
+.px{text-align:right}
+.big{font-size:clamp(32px,5vw,52px);font-weight:800;line-height:1}
+.big small{font-size:16px;font-weight:400;color:var(--mute)}
+#chg{font-weight:600;font-size:18px;white-space:nowrap}
+.upc{color:var(--up)}.dnc{color:var(--down)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin:18px 0}
+.stats div{background:var(--panel);padding:10px 14px}
+.stats span{display:block;font-size:13px;color:var(--mute)}.stats b{white-space:nowrap}
+.bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.seg{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--panel)}
+.seg button{border:0;background:none;padding:0 12px;height:40px;cursor:pointer;font-size:14px}
+.seg button.on{background:var(--ink);color:var(--bg)}
+.chk{display:flex;gap:6px;align-items:center;font-size:14px;cursor:pointer;min-height:40px}
+.chk input{width:18px;height:18px;accent-color:var(--sr)}
+.chartbox{position:relative;height:clamp(360px,56vh,560px);background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+#chart{position:absolute;inset:0}
+.chartbox[hidden],.bar[hidden]{display:none}
+.tvbox{height:clamp(420px,64vh,640px)}
+.tvbox .tradingview-widget-container,.tvbox .tradingview-widget-container__widget{height:100%;width:100%}
+#tvta{height:430px}#tvta .tradingview-widget-container{height:100%}
+.tvta{grid-column:1/-1}
+.news{margin-top:20px}
+.nhead{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+.nlist{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:0 28px}
+.ni{padding:14px 0;border-top:1px solid var(--line)}
+.ni a{color:var(--ink);font-weight:600;font-size:17px;line-height:1.4;text-decoration:none}
+.ni a:hover{text-decoration:underline;text-decoration-color:var(--acc)}
+.ni .en{margin:4px 0 0;font-size:13px;color:var(--mute)}
+.ni .meta{font-size:13px;color:var(--mute);margin-top:6px;display:flex;gap:8px;flex-wrap:wrap}
+.ni .pub{color:var(--sr);font-weight:600}
+.tabs{margin-bottom:10px;width:100%}.tabs button{flex:1}
+#gsum{margin:0 0 10px;font-size:14px}
+#legend{position:absolute;z-index:3;left:12px;top:8px;font-size:13px;pointer-events:none;display:flex;gap:10px;flex-wrap:wrap;background:color-mix(in srgb,var(--panel) 80%,transparent);padding:2px 6px;border-radius:6px}
+#err{position:absolute;z-index:4;inset:0;display:grid;place-items:center;text-align:center;padding:24px;background:var(--panel);color:var(--down)}
+#err[hidden]{display:none}
+.busy .chartbox::after{content:"";position:absolute;left:0;top:0;height:3px;width:40%;background:var(--acc);animation:ld 1s linear infinite;z-index:5}
+@keyframes ld{from{left:-40%}to{left:100%}}
+@media (prefers-reduced-motion:reduce){.busy .chartbox::after{animation:none;width:100%}}
+.cap{margin:8px 0 0;font-size:14px;color:var(--mute)}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;margin-top:20px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+h2{font-size:18px;margin:0 0 4px}
+.card h2+p{margin:0 0 10px}
+table{width:100%;border-collapse:collapse;font-size:15px}
+td,th{padding:7px 4px;border-bottom:1px solid var(--line);text-align:left}
+th{font-size:13px;color:var(--mute);font-weight:400}
+td.r,th.r{text-align:right;white-space:nowrap}
+tr.now td{background:var(--sea);font-weight:600}
+.lv{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px}
+.meter{position:relative;height:8px;border-radius:99px;background:linear-gradient(90deg,var(--down),var(--line) 50%,var(--up));margin:10px 0 4px}
+.meter i{position:absolute;top:-5px;width:4px;height:18px;border-radius:2px;background:var(--ink);transform:translateX(-50%)}
+.mrow{display:flex;justify-content:space-between;font-size:13px;color:var(--mute)}
+.side h2{margin-bottom:10px}
+.wl{display:grid;gap:8px}
+.wi{display:grid;grid-template-columns:minmax(0,1fr) 70px auto;gap:8px;align-items:center;width:100%;text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px;cursor:pointer;min-height:56px}
+.wi.on{border-color:var(--ink);box-shadow:inset 3px 0 0 var(--acc)}
+.wi b{display:block}.wi .nm{display:block;font-size:13px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wi .q{text-align:right;white-space:nowrap;font-size:14px}
+.wi svg{width:70px;height:28px}
+.wrow{position:relative}
+.wrow .x{position:absolute;right:-6px;top:-6px;width:22px;height:22px;border-radius:99px;border:1px solid var(--line);background:var(--panel);font-size:13px;line-height:1;cursor:pointer;opacity:0}
+.wrow:hover .x,.wrow .x:focus-visible{opacity:1}
+footer{max-width:1320px;margin:0 auto;padding:8px max(4vw,16px) 40px;font-size:13px;color:var(--mute)}
+@media(max-width:900px){.wrap{grid-template-columns:minmax(0,1fr)}.side{order:2}.wrow .x{opacity:1}}
+@media(max-width:600px){.px{text-align:left}.head{align-items:flex-start}.seg button{padding:0 9px}}
+</style>
+<script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><rect width="30" height="30" rx="8" fill="#13242e"/><path d="M5 21l6-6 4 4 9-10" fill="none" stroke="#34c983" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 24.5h20" stroke="#e08a4c" stroke-width="1.6" stroke-dasharray="2 2"/></svg>
+    <span>US Stock Tracker <small>ติดตามราคาหุ้นสหรัฐ</small></span>
+  </div>
+  <div class="search">
+    <input id="q" type="search" placeholder="ค้นหาหุ้น เช่น AAPL, Tesla, SPY" autocomplete="off" aria-label="ค้นหาหุ้น">
+    <ul id="sug" hidden role="listbox"></ul>
+  </div>
+</header>
+
+<main class="wrap">
+  <section>
+    <div class="head">
+      <div>
+        <div class="symrow"><span id="sym">–</span><span id="exch" class="tag"></span><span id="mkt" class="tag"></span><button id="star" type="button"></button></div>
+        <h1 id="name">กำลังโหลด…</h1>
+      </div>
+      <div class="px">
+        <div class="big" id="price">–</div>
+        <div id="chg">&nbsp;</div>
+        <div id="time" class="mute small"></div>
+      </div>
+    </div>
+    <div class="stats" id="stats"></div>
+    <div class="bar">
+      <div class="seg" id="src"><button type="button" data-v="yf">Yahoo Finance</button><button type="button" data-v="tv">TradingView</button></div>
+    </div>
+    <div class="bar" id="yfbar">
+      <div class="seg" id="ranges"></div>
+      <div class="seg" id="modes"><button type="button" data-m="candle">แท่งเทียน</button><button type="button" data-m="line">เส้น</button></div>
+      <label class="chk"><input type="checkbox" id="tSR" checked> แนวรับ/แนวต้าน</label>
+      <label class="chk"><input type="checkbox" id="tMA" checked> SMA 20/50</label>
+    </div>
+    <div class="chartbox" id="yfbox"><div id="legend"></div><div id="chart"></div><div id="err" hidden></div></div>
+    <div class="chartbox tvbox" id="tvbox" hidden></div>
+    <p class="cap" id="cap"></p>
+    <div class="grid2">
+      <div class="card">
+        <h2>แนวรับ – แนวต้าน</h2>
+        <p class="mute small">จากจุดกลับตัว (swing high/low) บนกราฟรายวันย้อนหลัง 1 ปี รวมระดับที่ห่างกันไม่เกิน 1.5% เข้าด้วยกัน</p>
+        <table id="srT"></table>
+      </div>
+      <div class="card">
+        <h2>Pivot Points</h2>
+        <p id="pvNote" class="mute small"></p>
+        <table id="pvT"></table>
+      </div>
+      <div class="card">
+        <h2>แนวโน้มและช่วง 52 สัปดาห์</h2>
+        <p id="trend"></p>
+        <div class="meter"><i id="m52"></i></div>
+        <div class="mrow"><span id="l52"></span><span id="h52"></span></div>
+      </div>
+      <div class="card tvta">
+        <h2>สัญญาณเทคนิคจาก TradingView</h2>
+        <p class="mute small">สรุปจากออสซิลเลเตอร์และเส้นค่าเฉลี่ย (กรอบเวลารายวัน)</p>
+        <div id="tvta"></div>
+      </div>
+    </div>
+    <div class="card news">
+      <div class="nhead"><h2>ข่าวล่าสุด <span id="nsym"></span></h2><span class="mute small">แปลเป็นภาษาไทยอัตโนมัติ · ต้นฉบับภาษาอังกฤษจาก Yahoo Finance</span></div>
+      <div id="news" class="nlist"></div>
+    </div>
+  </section>
+
+  <aside class="side">
+    <h2>หุ้นและ ETF</h2>
+    <div class="seg tabs" id="groups"><button type="button" data-g="mag7">Mag 7</button><button type="button" data-g="etf">ETF</button><button type="button" data-g="mine">ของฉัน</button></div>
+    <p id="gsum"></p>
+    <div class="wl" id="wl"></div>
+    <p class="mute small">ราคาอัปเดตทุก 60 วินาที · กราฟหลักทุก 30 วินาที · ข่าวทุก 10 นาที</p>
+  </aside>
+</main>
+<footer>ข้อมูลราคาจาก Yahoo Finance (finance.yahoo.com) ดึงผ่าน Supabase Edge Function · กราฟและสัญญาณเทคนิคแท็บ TradingView เป็นวิดเจ็ตทางการจาก <a href="https://www.tradingview.com" style="color:inherit">tradingview.com</a> · ราคาอาจล่าช้าได้ เวลาแสดงตามเวลาตลาดนิวยอร์กบนกราฟ · แนวรับแนวต้านคำนวณอัตโนมัติ ใช้ประกอบการวิเคราะห์เท่านั้น ไม่ใช่คำแนะนำการลงทุน</footer>
+
+<script>
+{
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const store = {get(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v??d}catch{return d}}, set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}};
+const RANGES = {'1D':['1d','5m'],'5D':['5d','15m'],'1M':['1mo','1d'],'3M':['3mo','1d'],'6M':['6mo','1d'],'1Y':['1y','1d'],'5Y':['5y','1wk']};
+const RLABEL = {'1D':'1 วัน','5D':'5 วัน','1M':'1 เดือน','3M':'3 เดือน','6M':'6 เดือน','1Y':'1 ปี','5Y':'5 ปี'};
+let sym = (decodeURIComponent(location.hash.slice(1)) || store.get('sym','AAPL')).toUpperCase();
+let rng = store.get('rng','6M'); if (!RANGES[rng]) rng = '6M';
+let mode = store.get('mode','candle');
+let watch = store.get('watch',[]);
+const GROUPS = {
+  mag7: {name:'Magnificent 7', list:['AAPL','MSFT','GOOGL','AMZN','NVDA','META','TSLA']},
+  etf:  {name:'ETF ยอดนิยม', list:['SPY','VOO','QQQ','VTI','DIA','IWM','SMH','XLK','SCHD','ARKK']},
+  mine: {name:'รายการของฉัน'}
+};
+let group = store.get('group','mag7'); if (!GROUPS[group]) group = 'mag7';
+const glist = () => group==='mine' ? watch : GROUPS[group].list;
+let showSR = true, showMA = true, barMap = new Map(), lastLevels = [], prevCloseLine = null;
+
+/* ---------- data (Supabase Edge Function → Yahoo Finance) ---------- */
+const API = 'https://vyutsvlusxyuoqjxxusi.supabase.co/functions/v1/yahoo';
+const ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ5dXRzdmx1c3h5dW9xanh4dXNpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTU1MTIzMDIsImV4cCI6MjExMTA4ODMwMn0.bygdGH0WCowzLBUVgNUycX-h8uoj8WkK6STQ8vJRepI';
+const api = qs => fetch(API+'?'+qs,{headers:{Authorization:'Bearer '+ANON,apikey:ANON}});
+const cache = new Map();
+function getChart(s, range, interval){
+  const k = s+'|'+range+'|'+interval, c = cache.get(k);
+  if (c && Date.now()-c.t < 25000) return c.p;
+  const p = api(`symbol=${encodeURIComponent(s)}&range=${range}&interval=${interval}`)
+    .then(async res => { const j = await res.json().catch(()=>null); const r = j?.chart?.result?.[0];
+      if (!res.ok || !r) throw new Error(j?.chart?.error?.description || j?.error || ('HTTP '+res.status)); return r; });
+  cache.set(k,{t:Date.now(),p}); p.catch(()=>cache.delete(k));
+  return p;
+}
+function bars(r){
+  const q = r.indicators?.quote?.[0] || {}, off = r.meta.gmtoffset || 0, ts = r.timestamp || [], out = [];
+  for (let i=0;i<ts.length;i++){
+    const o=q.open?.[i], h=q.high?.[i], l=q.low?.[i], c=q.close?.[i];
+    if (c==null || o==null || h==null || l==null) continue;
+    const b = {time:ts[i]+off, ts:ts[i], open:o, high:h, low:l, close:c, volume:q.volume?.[i]||0};
+    if (out.length && b.time <= out[out.length-1].time) out[out.length-1] = {...b, time:out[out.length-1].time}; else out.push(b);
+  }
+  return out;
+}
+const fp = v => v==null||!isFinite(v) ? '–' : v.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:Math.abs(v)<1?4:2});
+const fv = v => v==null||!isFinite(v) ? '–' : new Intl.NumberFormat('en-US',{notation:'compact',maximumFractionDigits:2}).format(v);
+const fpc = v => (v>=0?'+':'')+v.toFixed(2)+'%';
+const sgn = v => v>=0 ? 'upc' : 'dnc';
+const tfmt = (s,tz,opt) => new Date(s*1000).toLocaleString('th-TH',{timeZone:tz,...opt});
+function sma(arr,n){const out=[];let sum=0;for(let i=0;i<arr.length;i++){sum+=arr[i].close;if(i>=n)sum-=arr[i-n].close;if(i>=n-1)out.push({time:arr[i].time,value:sum/n})}return out}
+function marketState(m){
+  const p=m.currentTradingPeriod, now=Date.now()/1000;
+  if(!p) return ['',false];
+  if(now>=p.regular.start && now<p.regular.end) return ['ตลาดเปิด',true];
+  if(p.pre && now>=p.pre.start && now<p.pre.end) return ['ก่อนตลาดเปิด',false];
+  if(p.post && now>=p.post.start && now<p.post.end) return ['หลังตลาดปิด',false];
+  return ['ตลาดปิด',false];
+}
+
+/* ---------- chart ---------- */
+const probe = document.createElement('span'); probe.style.display='none'; document.body.appendChild(probe);
+const col = n => { probe.style.color = `var(${n})`; return getComputedStyle(probe).color; };
+const alpha = (c,a) => c.replace(/^rgb\((.+)\)$/,`rgba($1,${a})`);
+const LW = window.LightweightCharts;
+let chart, candle, area, vol, ma20, ma50;
+function initChart(){
+  if (!LW) { showErr('โหลดไลบรารีกราฟไม่สำเร็จ ลองรีเฟรชหน้า'); return false; }
+  chart = LW.createChart($('#chart'),{autoSize:true,crosshair:{mode:0},rightPriceScale:{borderVisible:false},timeScale:{borderVisible:false,rightOffset:4},localization:{priceFormatter:fp}});
+  candle = chart.addCandlestickSeries({borderVisible:false});
+  area = chart.addAreaSeries({lineWidth:2});
+  vol = chart.addHistogramSeries({priceFormat:{type:'volume'},priceScaleId:'vol',lastValueVisible:false,priceLineVisible:false});
+  chart.priceScale('vol').applyOptions({scaleMargins:{top:.8,bottom:0}});
+  chart.priceScale('right').applyOptions({scaleMargins:{top:.08,bottom:.25}});
+  const lo = {lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false};
+  ma20 = chart.addLineSeries(lo); ma50 = chart.addLineSeries(lo);
+  chart.subscribeCrosshairMove(p => legend(p.time!=null ? barMap.get(p.time) : null));
+  theme();
+  return true;
+}
+function theme(){
+  if(!chart) return;
+  const up=col('--up'), dn=col('--down'), ln=col('--line');
+  chart.applyOptions({layout:{background:{type:'solid',color:'transparent'},textColor:col('--mute'),fontFamily:'Overpass, "IBM Plex Sans Thai", sans-serif'},grid:{vertLines:{color:ln},horzLines:{color:ln}}});
+  candle.applyOptions({upColor:up,downColor:dn,wickUpColor:up,wickDownColor:dn});
+  ma20.applyOptions({color:col('--ma1')}); ma50.applyOptions({color:col('--ma2')});
+}
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{theme(); if(lastData) draw(lastData,false)});
+
+let lastData = null;
+function draw(d, fit){
+  lastData = d;
+  const b = d.bars, up=col('--up'), dn=col('--down'), intraday = !['1d','1wk','1mo'].includes(d.interval);
+  barMap = new Map(b.map(x=>[x.time,x]));
+  candle.setData(b.map(({time,open,high,low,close})=>({time,open,high,low,close})));
+  const last=b[b.length-1], first=b[0], rise = last && first ? last.close>=first.close : true;
+  const lc = rise?up:dn;
+  area.setData(b.map(x=>({time:x.time,value:x.close})));
+  area.applyOptions({lineColor:lc,topColor:alpha(lc,.28),bottomColor:alpha(lc,0)});
+  vol.setData(b.map(x=>({time:x.time,value:x.volume,color:alpha(x.close>=x.open?up:dn,.45)})));
+  candle.applyOptions({visible:mode==='candle'}); area.applyOptions({visible:mode!=='candle'});
+  ma20.setData(showMA?sma(b,20):[]); ma50.setData(showMA?sma(b,50):[]);
+  chart.applyOptions({timeScale:{timeVisible:intraday,secondsVisible:false}});
+  // price lines
+  for (const s of [candle,area]) { for (const l of (s._pl||[])) s.removePriceLine(l); s._pl=[]; }
+  const main = mode==='candle'?candle:area, srC = col('--sr');
+  if (showSR) for (const L of lastLevels) main._pl.push(main.createPriceLine({price:L.p,color:srC,lineWidth:L.kind==='R'?1:1,lineStyle:L.kind==='R'?2:0,axisLabelVisible:true,title:L.title}));
+  if (rng==='1D' && d.prev) main._pl.push(main.createPriceLine({price:d.prev,color:col('--mute'),lineWidth:1,lineStyle:3,axisLabelVisible:false,title:'ปิดก่อนหน้า'}));
+  if (fit) chart.timeScale().fitContent();
+  legend(null);
+}
+function legend(x){
+  const b = lastData?.bars; if(!b?.length){$('#legend').innerHTML='';return}
+  x = x || b[b.length-1];
+  const c = x.close>=x.open?'upc':'dnc';
+  $('#legend').innerHTML = `<span>O <b class="${c}">${fp(x.open)}</b></span><span>H <b class="${c}">${fp(x.high)}</b></span><span>L <b class="${c}">${fp(x.low)}</b></span><span>C <b class="${c}">${fp(x.close)}</b></span><span>Vol <b>${fv(x.volume)}</b></span>`;
+}
+function showErr(msg){ const e=$('#err'); e.hidden=false; e.textContent=msg; }
+
+/* ---------- analysis ---------- */
+function swingLevels(D, price){
+  const k=3, c=[];
+  for (let i=k;i<D.length-k;i++){
+    let hi=true, lo=true;
+    for (let j=i-k;j<=i+k;j++){ if(D[j].high>D[i].high) hi=false; if(D[j].low<D[i].low) lo=false; }
+    if (hi) c.push({p:D[i].high,i}); if (lo) c.push({p:D[i].low,i});
+  }
+  c.sort((a,b)=>a.p-b.p);
+  const cl=[];
+  for (const x of c){ const g=cl[cl.length-1];
+    if (g && Math.abs(x.p-g.p)/g.p<0.015){ g.sum+=x.p; g.n++; g.p=g.sum/g.n; g.last=Math.max(g.last,x.i); }
+    else cl.push({p:x.p,sum:x.p,n:1,last:x.i}); }
+  const res = cl.filter(g=>g.p>price*1.002).sort((a,b)=>a.p-b.p).slice(0,3);
+  const sup = cl.filter(g=>g.p<price*0.998).sort((a,b)=>b.p-a.p).slice(0,3);
+  return {res,sup};
+}
+function pivots(bar){
+  const {high:H,low:L,close:C}=bar, P=(H+L+C)/3;
+  return [['R3',H+2*(P-L)],['R2',P+(H-L)],['R1',2*P-L],['P',P],['S1',2*P-H],['S2',P-(H-L)],['S3',L-2*(H-P)]];
+}
+function renderAnalysis(D, price, open, meta){
+  const {res,sup} = swingLevels(D, price);
+  const dd = i => tfmt(D[Math.min(i,D.length-1)].ts,'America/New_York',{day:'numeric',month:'short',year:'2-digit'});
+  const row = (g,k,i) => `<tr><td><span class="lv" style="background:var(--${k==='R'?'down':'up'})"></span>${k}${i+1}</td><td class="r">${fp(g.p)}</td><td class="r ${sgn(g.p-price)}">${fpc((g.p/price-1)*100)}</td><td class="r mute">${g.n} ครั้ง · ${dd(g.last)}</td></tr>`;
+  $('#srT').innerHTML = `<tr><th>ระดับ</th><th class="r">ราคา (USD)</th><th class="r">ห่างจากราคา</th><th class="r">แตะ · ล่าสุด</th></tr>`
+    + (res.length ? res.slice().reverse().map((g,i)=>row(g,'R',res.length-1-i)).join('') : `<tr><td colspan="4" class="mute">ไม่มีแนวต้านเหนือราคาในรอบ 1 ปี — ใช้จุดสูงสุด 52 สัปดาห์ ${fp(meta.fiftyTwoWeekHigh)}</td></tr>`)
+    + `<tr class="now"><td>ราคาปัจจุบัน</td><td class="r">${fp(price)}</td><td class="r">–</td><td></td></tr>`
+    + (sup.length ? sup.map((g,i)=>row(g,'S',i)).join('') : `<tr><td colspan="4" class="mute">ไม่มีแนวรับใต้ราคาในรอบ 1 ปี</td></tr>`);
+  lastLevels = [...res.slice(0,2).map((g,i)=>({p:g.p,kind:'R',title:'R'+(i+1)})), ...sup.slice(0,2).map((g,i)=>({p:g.p,kind:'S',title:'S'+(i+1)}))];
+  // pivots from last completed daily bar
+  const base = open && D.length>1 ? D[D.length-2] : D[D.length-1];
+  $('#pvNote').textContent = `Classic pivot จากแท่งวันที่ ${tfmt(base.ts,'America/New_York',{day:'numeric',month:'short',year:'numeric'})} (H ${fp(base.high)} · L ${fp(base.low)} · C ${fp(base.close)})`;
+  $('#pvT').innerHTML = `<tr><th>ระดับ</th><th class="r">ราคา</th><th class="r">ห่างจากราคา</th></tr>` + pivots(base).map(([k,v])=>`<tr${k==='P'?' class="now"':''}><td>${k}</td><td class="r">${fp(v)}</td><td class="r ${sgn(v-price)}">${fpc((v/price-1)*100)}</td></tr>`).join('');
+  // trend
+  const s50 = sma(D,50).pop()?.value, s200 = D.length>=200 ? sma(D,200).pop()?.value : null;
+  let t = '';
+  if (s50 && s200){
+    const a50=price>s50, a200=price>s200;
+    t = a50&&a200 ? 'ราคาอยู่เหนือ SMA50 และ SMA200 — แนวโน้มขาขึ้น' : !a50&&!a200 ? 'ราคาอยู่ใต้ SMA50 และ SMA200 — แนวโน้มขาลง' : a200 ? 'ราคาย่อตัวลงใต้ SMA50 แต่ยังเหนือ SMA200 — พักตัวในแนวโน้มขาขึ้น' : 'ราคาขึ้นเหนือ SMA50 แต่ยังใต้ SMA200 — ฟื้นตัวในแนวโน้มขาลง';
+    t += ` (SMA50 ${fp(s50)} · SMA200 ${fp(s200)}${s50>s200?' · Golden cross':' · Death cross'})`;
+  } else if (s50) t = `ราคา${price>s50?'เหนือ':'ใต้'} SMA50 (${fp(s50)})`;
+  $('#trend').textContent = t || 'ข้อมูลไม่พอคำนวณแนวโน้ม';
+  const lo52=meta.fiftyTwoWeekLow, hi52=meta.fiftyTwoWeekHigh;
+  if (lo52!=null && hi52>lo52){ $('#m52').style.left = Math.max(0,Math.min(100,(price-lo52)/(hi52-lo52)*100))+'%'; }
+  $('#l52').textContent = 'ต่ำสุด '+fp(lo52); $('#h52').textContent = 'สูงสุด '+fp(hi52);
+}
+
+/* ---------- main load ---------- */
+async function load(fit=true){
+  const [rg,iv] = RANGES[rng];
+  document.body.classList.add('busy');
+  try{
+    const [Q,R,Dy] = await Promise.all([getChart(sym,'1d','5m'), getChart(sym,rg,iv), getChart(sym,'1y','1d')]);
+    $('#err').hidden = true;
+    const m = Q.meta, price = m.regularMarketPrice, prev = m.chartPreviousClose ?? m.previousClose;
+    const [st, open] = marketState(m);
+    $('#sym').textContent = m.symbol; $('#exch').textContent = m.fullExchangeName || m.exchangeName || '';
+    const mk=$('#mkt'); mk.textContent = st; mk.className = 'tag'+(open?' open':''); mk.hidden=!st;
+    $('#name').textContent = m.longName || m.shortName || m.symbol;
+    document.title = `${m.symbol} ${fp(price)} · US Stock Tracker`;
+    $('#price').innerHTML = `${esc(fp(price))} <small>${esc(m.currency||'USD')}</small>`;
+    const ch = price-prev, pc = ch/prev*100;
+    $('#chg').className = sgn(ch); $('#chg').textContent = `${ch>=0?'▲':'▼'} ${(ch>=0?'+':'')}${fp(ch)} (${fpc(pc)}) วันนี้`;
+    $('#time').textContent = `อัปเดต ${tfmt(m.regularMarketTime,'Asia/Bangkok',{dateStyle:'medium',timeStyle:'short'})} น. (ไทย) · ${new Date(m.regularMarketTime*1000).toLocaleTimeString('en-US',{timeZone:'America/New_York',hour:'numeric',minute:'2-digit'})} NY`;
+    const qb = bars(Q), D = bars(Dy);
+    const stats = [['เปิด',fp(qb[0]?.open)],['สูงสุดวันนี้',fp(m.regularMarketDayHigh)],['ต่ำสุดวันนี้',fp(m.regularMarketDayLow)],['ปิดก่อนหน้า',fp(prev)],['ปริมาณซื้อขาย',fv(m.regularMarketVolume)],['ช่วง 52 สัปดาห์',`${fp(m.fiftyTwoWeekLow)} – ${fp(m.fiftyTwoWeekHigh)}`]];
+    $('#stats').innerHTML = stats.map(([k,v])=>`<div><span>${k}</span><b class="num">${esc(v)}</b></div>`).join('');
+    renderAnalysis(D, price, open, m);
+    const b = rng==='1D' ? qb : bars(R);
+    if (chart) draw({bars:b, interval:iv, prev}, fit);
+    if (b.length>1){ const f=b[0].close, l=b[b.length-1].close, vsum=b.reduce((s,x)=>s+x.volume,0);
+      $('#cap').innerHTML = `ช่วง ${RLABEL[rng]}: <b class="${sgn(l-f)}">${fpc((l/f-1)*100)}</b> · สูงสุด ${fp(Math.max(...b.map(x=>x.high)))} · ต่ำสุด ${fp(Math.min(...b.map(x=>x.low)))} · วอลุ่มรวม ${fv(vsum)} หุ้น · เส้นประสีน้ำตาล = แนวต้าน, เส้นทึบ = แนวรับ`; }
+    starBtn();
+    store.set('sym',sym);
+    tvSym = tvSymbol(m);
+    if (tvSym !== tvShown) renderTV();
+    newsName = m.longName || m.shortName || '';
+    loadNews(false);
+  }catch(e){
+    showErr(`ดึงข้อมูล ${sym} ไม่สำเร็จ: ${e.message}`);
+    $('#name').textContent = sym;
+  }finally{ document.body.classList.remove('busy'); }
+}
+
+function select(s){
+  sym = s.toUpperCase(); history.replaceState(null,'','#'+encodeURIComponent(sym));
+  renderWatch(); load(true);
+}
+
+/* ---------- TradingView widgets ---------- */
+let view = store.get('view','yf'), tvSym = sym, tvShown = '', tvChartShown = '';
+const EXMAP = {NMS:'NASDAQ',NGM:'NASDAQ',NCM:'NASDAQ',NAS:'NASDAQ',NYQ:'NYSE',NYS:'NYSE',PCX:'AMEX',ASE:'AMEX',BTS:'CBOE',CBOE:'CBOE'};
+function tvSymbol(m){ const ex = EXMAP[m.exchangeName]; const s = m.symbol.replace('-','.'); return ex && !s.startsWith('^') ? ex+':'+s : s; }
+const dark = () => matchMedia('(prefers-color-scheme: dark)').matches;
+function tvWidget(el, script, cfg){
+  el.innerHTML = '<div class="tradingview-widget-container"><div class="tradingview-widget-container__widget"></div></div>';
+  const sc = document.createElement('script');
+  sc.src = 'https://s3.tradingview.com/external-embedding/' + script; sc.async = true; sc.type = 'text/javascript';
+  sc.text = JSON.stringify(cfg);
+  el.firstChild.appendChild(sc);
+}
+function renderTV(){
+  tvShown = tvSym;
+  const th = dark() ? 'dark' : 'light';
+  tvWidget($('#tvta'), 'embed-widget-technical-analysis.js', {interval:'1D',width:'100%',height:'100%',isTransparent:true,showIntervalTabs:true,displayMode:'multiple',symbol:tvSym,locale:'th_TH',colorTheme:th});
+  if (view==='tv') renderTVChart();
+}
+function renderTVChart(){
+  if (tvChartShown === tvSym) return; tvChartShown = tvSym;
+  tvWidget($('#tvbox'), 'embed-widget-advanced-chart.js', {autosize:true,symbol:tvSym,interval:'D',timezone:'America/New_York',theme:dark()?'dark':'light',style:'1',locale:'th_TH',allow_symbol_change:false,hide_side_toolbar:false,withdateranges:true,studies:['STD;Volume'],support_host:'https://www.tradingview.com'});
+}
+function setView(v){
+  view = v; store.set('view',v);
+  document.querySelectorAll('#src button').forEach(x=>x.classList.toggle('on',x.dataset.v===v));
+  $('#yfbox').hidden = $('#yfbar').hidden = v!=='yf'; $('#cap').hidden = v!=='yf'; $('#tvbox').hidden = v!=='tv';
+  if (v==='tv') renderTVChart();
+}
+$('#src').addEventListener('click',e=>{const v=e.target.closest('button')?.dataset.v; if(v) setView(v);});
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{tvChartShown=''; renderTV();});
+
+/* ---------- controls ---------- */
+$('#ranges').innerHTML = Object.keys(RANGES).map(k=>`<button type="button" data-r="${k}">${k}</button>`).join('');
+const syncBtns = () => { document.querySelectorAll('#ranges button').forEach(x=>x.classList.toggle('on',x.dataset.r===rng)); document.querySelectorAll('#modes button').forEach(x=>x.classList.toggle('on',x.dataset.m===mode)); };
+$('#ranges').addEventListener('click',e=>{const r=e.target.closest('button')?.dataset.r; if(!r)return; rng=r; store.set('rng',r); syncBtns(); load(true);});
+$('#modes').addEventListener('click',e=>{const m=e.target.closest('button')?.dataset.m; if(!m)return; mode=m; store.set('mode',m); syncBtns(); if(lastData) draw(lastData,false);});
+$('#tSR').addEventListener('change',e=>{showSR=e.target.checked; if(lastData) draw(lastData,false);});
+$('#tMA').addEventListener('change',e=>{showMA=e.target.checked; if(lastData) draw(lastData,false);});
+function starBtn(){ const on = watch.includes(sym); $('#star').textContent = on ? '✓ อยู่ในรายการของฉัน' : '+ เพิ่มในรายการของฉัน'; }
+$('#star').addEventListener('click',()=>{ watch = watch.includes(sym) ? watch.filter(s=>s!==sym) : [...watch,sym]; store.set('watch',watch); starBtn(); renderWatch(); refreshWatch(); });
+
+/* ---------- search ---------- */
+let sugItems=[], sugIdx=-1, timer;
+const q=$('#q'), sug=$('#sug');
+function showSug(){
+  sug.hidden = !sugItems.length;
+  sug.innerHTML = sugItems.map((x,i)=>`<li role="option" data-i="${i}" class="${i===sugIdx?'on':''}"><b>${esc(x.symbol)}</b><span>${esc(x.name)}</span><small class="mute">${esc(x.exch)}</small></li>`).join('');
+}
+q.addEventListener('input',()=>{ clearTimeout(timer); const v=q.value.trim(); if(!v){sugItems=[];showSug();return}
+  timer=setTimeout(async()=>{ try{ const j=await (await api('type=search&q='+encodeURIComponent(v))).json(); sugItems=j.quotes||[]; sugIdx=-1; showSug(); }catch{} },250); });
+q.addEventListener('keydown',e=>{
+  if(e.key==='ArrowDown'){sugIdx=Math.min(sugItems.length-1,sugIdx+1);showSug();e.preventDefault()}
+  else if(e.key==='ArrowUp'){sugIdx=Math.max(0,sugIdx-1);showSug();e.preventDefault()}
+  else if(e.key==='Enter'){ const it=sugItems[sugIdx]||sugItems[0]; const s=it?it.symbol:q.value.trim(); if(s&&/^[A-Za-z0-9.\-^=]{1,15}$/.test(s)){q.value='';sugItems=[];showSug();q.blur();select(s)} }
+  else if(e.key==='Escape'){sugItems=[];showSug()}
+});
+sug.addEventListener('mousedown',e=>{const li=e.target.closest('li'); if(!li)return; e.preventDefault(); const s=sugItems[+li.dataset.i].symbol; q.value=''; sugItems=[]; showSug(); select(s);});
+q.addEventListener('blur',()=>setTimeout(()=>{sugItems=[];showSug()},150));
+
+/* ---------- news (Yahoo Finance) + Thai translation in the browser ---------- */
+const trMem = new Map();
+async function gtx(text){
+  const urls = ['https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=th&dt=t&q=', 'https://clients5.google.com/translate_a/t?client=dict-chrome-ex&sl=en&tl=th&q='];
+  for (const [i,u] of urls.entries()){
+    try{ const j = await (await fetch(u+encodeURIComponent(text))).json();
+      const out = i===0 ? (j[0]||[]).map(s=>s[0]).join('') : (Array.isArray(j)?(Array.isArray(j[0])?j[0][0]:j[0]):'');
+      if (out) return out; }catch{}
+  }
+  return '';
+}
+async function translateAll(texts){
+  const todo = [...new Set(texts.filter(t=>t && !trMem.has(t)))];
+  for (let i=0;i<todo.length;i+=12){
+    const chunk = todo.slice(i,i+12), out = (await gtx(chunk.join('\n'))).split('\n');
+    if (out.length===chunk.length) chunk.forEach((t,k)=>trMem.set(t,out[k].trim()));
+    else await Promise.all(chunk.map(async t=>trMem.set(t, await gtx(t))));
+  }
+}
+const ago = s => { if(!s) return ''; const d=Date.now()/1000-s; return d<3600?Math.max(1,Math.round(d/60))+' นาทีที่แล้ว':d<86400?Math.round(d/3600)+' ชั่วโมงที่แล้ว':Math.round(d/86400)+' วันที่แล้ว'; };
+const safeUrl = u => /^https?:\/\//i.test(u||'') ? u : '#';
+let newsFor = '', newsName = '';
+async function loadNews(force){
+  if (!force && newsFor===sym) return;
+  const s = sym; newsFor = s; $('#nsym').textContent = s;
+  if (!force) $('#news').innerHTML = '<p class="mute">กำลังโหลดข่าว…</p>';
+  try{
+    const j = await (await api(`type=news&symbol=${encodeURIComponent(s)}&name=${encodeURIComponent(newsName)}`)).json();
+    if (s!==sym) return;
+    const it = j.items || [];
+    if (!it.length){ $('#news').innerHTML = '<p class="mute">ยังไม่มีข่าวล่าสุดของหุ้นตัวนี้</p>'; return; }
+    await translateAll(it.flatMap(n=>[n.title,n.summary]));
+    if (s!==sym) return;
+    $('#news').innerHTML = it.map(n=>{ const th=trMem.get(n.title), sm=n.summary?(trMem.get(n.summary)||n.summary):'';
+      return `<article class="ni"><a href="${esc(safeUrl(n.link))}" target="_blank" rel="noopener">${esc(th||n.title)}</a>${sm?`<p style="margin:6px 0 0">${esc(sm)}</p>`:''}${th?`<p class="en">${esc(n.title)}</p>`:''}<div class="meta"><span class="pub">${esc(n.publisher)}</span><span>${esc(ago(n.time))}</span>${n.time?`<span>${esc(tfmt(n.time,'Asia/Bangkok',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}))} น.</span>`:''}</div></article>`; }).join('');
+  }catch(e){ if (s===sym) $('#news').innerHTML = `<p class="dnc">โหลดข่าวไม่สำเร็จ: ${esc(e.message)}</p>`; }
+}
+
+/* ---------- watchlist ---------- */
+const wq = {};
+function spark(b,prev){
+  if(!b||b.length<2) return '';
+  const vs=b.map(x=>x.close), lo=Math.min(...vs,prev), hi=Math.max(...vs,prev), W=70, H=28, y=v=>H-2-(v-lo)/((hi-lo)||1)*(H-4);
+  const d=vs.map((v,i)=>`${i?'L':'M'}${(i/(vs.length-1)*W).toFixed(1)},${y(v).toFixed(1)}`).join('');
+  const c=vs[vs.length-1]>=prev?'var(--up)':'var(--down)';
+  return `<svg viewBox="0 0 ${W} ${H}" aria-hidden="true"><path d="M0,${y(prev).toFixed(1)}H${W}" stroke="var(--line)" stroke-dasharray="2 2"/><path d="${d}" fill="none" stroke="${c}" stroke-width="1.5"/></svg>`;
+}
+function renderWatch(){
+  document.querySelectorAll('#groups button').forEach(x=>x.classList.toggle('on',x.dataset.g===group));
+  const L = glist(), chs = L.map(s=>{const m=wq[s]?.meta; const pv=m?(m.chartPreviousClose??m.previousClose):null; return m&&pv?(m.regularMarketPrice/pv-1)*100:null}).filter(v=>v!=null);
+  $('#gsum').innerHTML = chs.length ? `${esc(GROUPS[group].name)} วันนี้ เฉลี่ย <b class="${sgn(chs.reduce((a,b)=>a+b,0)/chs.length)}">${fpc(chs.reduce((a,b)=>a+b,0)/chs.length)}</b> · ขึ้น <span class="upc">${chs.filter(v=>v>=0).length}</span> ลง <span class="dnc">${chs.filter(v=>v<0).length}</span>` : esc(GROUPS[group].name);
+  $('#wl').innerHTML = L.length ? L.map(s=>{ const r=wq[s], m=r?.meta, p=m?.regularMarketPrice, pv=m?(m.chartPreviousClose??m.previousClose):null, ch=p!=null&&pv?(p/pv-1)*100:null;
+    return `<div class="wrow"><button type="button" class="wi${s===sym?' on':''}" data-s="${esc(s)}"><span><b>${esc(s)}</b><span class="nm">${esc(m?.shortName||m?.longName||'')}</span></span>${r?spark(bars(r),pv):'<span></span>'}<span class="q"><b class="num">${fp(p)}</b><span class="num ${ch==null?'':sgn(ch)}">${ch==null?'…':fpc(ch)}</span></span></button>${group==='mine'?`<button type="button" class="x" data-x="${esc(s)}" aria-label="ลบ ${esc(s)}">×</button>`:''}</div>`; }).join('')
+    : '<p class="mute">ยังไม่มีหุ้นในรายการ ค้นหาหุ้นแล้วกด “+ เพิ่มในรายการของฉัน”</p>';
+}
+$('#wl').addEventListener('click',e=>{
+  const x=e.target.closest('[data-x]'); if(x){ watch=watch.filter(s=>s!==x.dataset.x); store.set('watch',watch); renderWatch(); starBtn(); return; }
+  const b=e.target.closest('[data-s]'); if(b) select(b.dataset.s);
+});
+$('#groups').addEventListener('click',e=>{const g=e.target.closest('button')?.dataset.g; if(!g)return; group=g; store.set('group',g); renderWatch(); refreshWatch();});
+async function refreshWatch(){
+  await Promise.allSettled(glist().map(s=>getChart(s,'1d','5m').then(r=>{wq[s]=r})));
+  renderWatch();
+}
+
+/* ---------- start ---------- */
+syncBtns();
+setView(view === 'tv' ? 'tv' : 'yf');
+const ok = initChart();
+history.replaceState(null,'','#'+encodeURIComponent(sym));
+renderWatch();
+if (ok) load(true);
+refreshWatch();
+addEventListener('hashchange',()=>{const s=decodeURIComponent(location.hash.slice(1)).toUpperCase(); if(s&&s!==sym) select(s);});
+setInterval(()=>{ if(!document.hidden && ok) load(false); },30000);
+setInterval(()=>{ if(!document.hidden) refreshWatch(); },60000);
+setInterval(()=>{ if(!document.hidden) loadNews(true); },600000);
+}
+</script>
+</body>
+</html>
