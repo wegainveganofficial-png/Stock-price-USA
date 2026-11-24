@@ -71,6 +71,19 @@ h1{margin:4px 0 0;font-size:clamp(24px,3.4vw,40px);line-height:1.05;text-wrap:ba
 .ni .pub{color:var(--sr);font-weight:600}
 .tabs{margin-bottom:10px;width:100%}.tabs button{flex:1}
 #gsum{margin:0 0 10px;font-size:14px}
+.wl{max-height:calc(100vh - 230px);overflow:auto;padding:2px 2px 2px 0;align-content:start}
+.wrow .x{right:4px;top:4px}
+.spctl{display:grid;gap:8px;margin-bottom:10px}.spctl[hidden]{display:none}
+.spctl input,.spctl select{height:44px;border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:0 10px;font-size:16px;width:100%}
+.spctl .two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
+.sec{display:grid;gap:3px;margin:0 0 12px}.sec[hidden]{display:none}
+.sec button{display:grid;grid-template-columns:minmax(0,1fr) 110px 58px;gap:6px;align-items:center;border:0;background:none;padding:3px 4px;border-radius:6px;cursor:pointer;font-size:13px;text-align:left;min-height:28px}
+.sec button:hover,.sec button.on{background:var(--sea)}
+.sec .bar2{position:relative;height:8px;background:var(--line);border-radius:4px}
+.sec .bar2 i{position:absolute;top:0;bottom:0;border-radius:4px}
+.sec .v{text-align:right;font-variant-numeric:tabular-nums}
+.wi .sx{display:block;font-size:12px;color:var(--mute)}
+@media(max-width:900px){.wl{max-height:70vh}}
 #legend{position:absolute;z-index:3;left:12px;top:8px;font-size:13px;pointer-events:none;display:flex;gap:10px;flex-wrap:wrap;background:color-mix(in srgb,var(--panel) 80%,transparent);padding:2px 6px;border-radius:6px}
 #err{position:absolute;z-index:4;inset:0;display:grid;place-items:center;text-align:center;padding:24px;background:var(--panel);color:var(--down)}
 #err[hidden]{display:none}
@@ -176,8 +189,16 @@ footer{max-width:1320px;margin:0 auto;padding:8px max(4vw,16px) 40px;font-size:1
 
   <aside class="side">
     <h2>หุ้นและ ETF</h2>
-    <div class="seg tabs" id="groups"><button type="button" data-g="mag7">Mag 7</button><button type="button" data-g="etf">ETF</button><button type="button" data-g="mine">ของฉัน</button></div>
+    <div class="seg tabs" id="groups"><button type="button" data-g="mag7">Mag 7</button><button type="button" data-g="etf">ETF</button><button type="button" data-g="sp500">S&amp;P 500</button><button type="button" data-g="mine">ของฉัน</button></div>
     <p id="gsum"></p>
+    <div class="sec" id="sec" hidden></div>
+    <div class="spctl" id="spctl" hidden>
+      <input id="spq" type="search" placeholder="กรองชื่อหรือสัญลักษณ์ เช่น bank, XOM" aria-label="กรองหุ้น S&amp;P 500">
+      <div class="two">
+        <select id="spsec" aria-label="กลุ่มอุตสาหกรรม"><option value="">ทุกกลุ่มอุตสาหกรรม</option></select>
+        <select id="spsort" aria-label="เรียงลำดับ"><option value="up">บวกมากสุด</option><option value="down">ลบมากสุด</option><option value="sym">ตามสัญลักษณ์ A–Z</option></select>
+      </div>
+    </div>
     <div class="wl" id="wl"></div>
     <p class="mute small">ราคาอัปเดตทุก 60 วินาที · กราฟหลักทุก 30 วินาที · ข่าวทุก 10 นาที</p>
   </aside>
@@ -198,8 +219,13 @@ let watch = store.get('watch',[]);
 const GROUPS = {
   mag7: {name:'Magnificent 7', list:['AAPL','MSFT','GOOGL','AMZN','NVDA','META','TSLA']},
   etf:  {name:'ETF ยอดนิยม', list:['SPY','VOO','QQQ','VTI','DIA','IWM','SMH','XLK','SCHD','ARKK']},
+  sp500:{name:'S&P 500', list:[]},
   mine: {name:'รายการของฉัน'}
 };
+const NAMES = Object.assign({AAPL:'Apple',MSFT:'Microsoft',GOOGL:'Alphabet (Google)',AMZN:'Amazon',NVDA:'NVIDIA',META:'Meta Platforms',TSLA:'Tesla',
+  SPY:'SPDR S&P 500 ETF',VOO:'Vanguard S&P 500 ETF',QQQ:'Invesco QQQ (Nasdaq-100)',VTI:'Vanguard Total Stock Market',DIA:'SPDR Dow Jones Industrial',IWM:'iShares Russell 2000',SMH:'VanEck Semiconductor ETF',XLK:'Technology Select Sector SPDR',SCHD:'Schwab US Dividend Equity',ARKK:'ARK Innovation ETF'}, store.get('names',{}));
+const SECTOR_TH = {'Information Technology':'เทคโนโลยีสารสนเทศ','Health Care':'การแพทย์','Financials':'การเงิน','Consumer Discretionary':'สินค้าฟุ่มเฟือย','Communication Services':'สื่อสาร','Industrials':'อุตสาหกรรม','Consumer Staples':'สินค้าจำเป็น','Energy':'พลังงาน','Utilities':'สาธารณูปโภค','Real Estate':'อสังหาริมทรัพย์','Materials':'วัสดุ'};
+let SP = [], SPMAP = {};
 let group = store.get('group','mag7'); if (!GROUPS[group]) group = 'mag7';
 const glist = () => group==='mine' ? watch : GROUPS[group].list;
 let showSR = true, showMA = true, barMap = new Map(), lastLevels = [], prevCloseLine = null;
@@ -380,6 +406,7 @@ async function load(fit=true){
     tvSym = tvSymbol(m);
     if (tvSym !== tvShown) renderTV();
     newsName = m.longName || m.shortName || '';
+    if (!NAMES[m.symbol] && newsName){ NAMES[m.symbol] = newsName; const sv=store.get('names',{}); sv[m.symbol]=newsName; store.set('names',sv); }
     loadNews(false);
   }catch(e){
     showErr(`ดึงข้อมูล ${sym} ไม่สำเร็จ: ${e.message}`);
@@ -489,30 +516,72 @@ async function loadNews(force){
   }catch(e){ if (s===sym) $('#news').innerHTML = `<p class="dnc">โหลดข่าวไม่สำเร็จ: ${esc(e.message)}</p>`; }
 }
 
-/* ---------- watchlist ---------- */
-const wq = {};
-function spark(b,prev){
-  if(!b||b.length<2) return '';
-  const vs=b.map(x=>x.close), lo=Math.min(...vs,prev), hi=Math.max(...vs,prev), W=70, H=28, y=v=>H-2-(v-lo)/((hi-lo)||1)*(H-4);
+/* ---------- watchlist groups ---------- */
+const wq = {};   // symbol -> {price, prev, closes}
+const chgOf = s => { const q=wq[s]; return q&&q.price!=null&&q.prev ? (q.price/q.prev-1)*100 : null; };
+function spark(vs,prev){
+  if(!vs||vs.length<2||!prev) return '<span></span>';
+  const lo=Math.min(...vs,prev), hi=Math.max(...vs,prev), W=70, H=28, y=v=>H-2-(v-lo)/((hi-lo)||1)*(H-4);
   const d=vs.map((v,i)=>`${i?'L':'M'}${(i/(vs.length-1)*W).toFixed(1)},${y(v).toFixed(1)}`).join('');
   const c=vs[vs.length-1]>=prev?'var(--up)':'var(--down)';
   return `<svg viewBox="0 0 ${W} ${H}" aria-hidden="true"><path d="M0,${y(prev).toFixed(1)}H${W}" stroke="var(--line)" stroke-dasharray="2 2"/><path d="${d}" fill="none" stroke="${c}" stroke-width="1.5"/></svg>`;
 }
+function visible(){
+  let L = glist();
+  if (group==='sp500'){
+    const f=$('#spq').value.trim().toLowerCase(), sec=$('#spsec').value, so=$('#spsort').value;
+    L = L.filter(s=>{ const m=SPMAP[s]; return (!sec||m?.sector===sec) && (!f || s.toLowerCase().includes(f) || (m?.name||'').toLowerCase().includes(f) || (m?.industry||'').toLowerCase().includes(f)); });
+    const cv = s => chgOf(s) ?? (so==='down'?Infinity:-Infinity);
+    L = [...L].sort(so==='sym' ? (x,y)=>x.localeCompare(y) : so==='down' ? (x,y)=>cv(x)-cv(y) : (x,y)=>cv(y)-cv(x));
+  }
+  return L;
+}
+function renderSectors(){
+  const box=$('#sec'); box.hidden = group!=='sp500' || !SP.length; if (box.hidden) return;
+  const by={}; for (const m of SP){ const c=chgOf(m.symbol); if(c==null) continue; (by[m.sector] ||= []).push(c); }
+  const rows=Object.entries(by).map(([k,v])=>[k,v.reduce((a,b)=>a+b,0)/v.length,v.length]).sort((a,b)=>b[1]-a[1]);
+  const mx=Math.max(0.5,...rows.map(r=>Math.abs(r[1]))), cur=$('#spsec').value;
+  box.innerHTML = rows.map(([k,v,n])=>{ const w=Math.abs(v)/mx*50, c=v>=0?'var(--up)':'var(--down)';
+    return `<button type="button" data-sec="${esc(k)}" class="${k===cur?'on':''}" title="${esc(k)} · ${n} บริษัท"><span>${esc(SECTOR_TH[k]||k)}</span><span class="bar2"><i style="left:${v>=0?50:50-w}%;width:${w}%;background:${c}"></i></span><span class="v ${sgn(v)}">${fpc(v)}</span></button>`; }).join('');
+}
 function renderWatch(){
   document.querySelectorAll('#groups button').forEach(x=>x.classList.toggle('on',x.dataset.g===group));
-  const L = glist(), chs = L.map(s=>{const m=wq[s]?.meta; const pv=m?(m.chartPreviousClose??m.previousClose):null; return m&&pv?(m.regularMarketPrice/pv-1)*100:null}).filter(v=>v!=null);
-  $('#gsum').innerHTML = chs.length ? `${esc(GROUPS[group].name)} วันนี้ เฉลี่ย <b class="${sgn(chs.reduce((a,b)=>a+b,0)/chs.length)}">${fpc(chs.reduce((a,b)=>a+b,0)/chs.length)}</b> · ขึ้น <span class="upc">${chs.filter(v=>v>=0).length}</span> ลง <span class="dnc">${chs.filter(v=>v<0).length}</span>` : esc(GROUPS[group].name);
-  $('#wl').innerHTML = L.length ? L.map(s=>{ const r=wq[s], m=r?.meta, p=m?.regularMarketPrice, pv=m?(m.chartPreviousClose??m.previousClose):null, ch=p!=null&&pv?(p/pv-1)*100:null;
-    return `<div class="wrow"><button type="button" class="wi${s===sym?' on':''}" data-s="${esc(s)}"><span><b>${esc(s)}</b><span class="nm">${esc(m?.shortName||m?.longName||'')}</span></span>${r?spark(bars(r),pv):'<span></span>'}<span class="q"><b class="num">${fp(p)}</b><span class="num ${ch==null?'':sgn(ch)}">${ch==null?'…':fpc(ch)}</span></span></button>${group==='mine'?`<button type="button" class="x" data-x="${esc(s)}" aria-label="ลบ ${esc(s)}">×</button>`:''}</div>`; }).join('')
-    : '<p class="mute">ยังไม่มีหุ้นในรายการ ค้นหาหุ้นแล้วกด “+ เพิ่มในรายการของฉัน”</p>';
+  $('#spctl').hidden = group!=='sp500';
+  const all = glist(), chs = all.map(chgOf).filter(v=>v!=null), avg = chs.length ? chs.reduce((a,b)=>a+b,0)/chs.length : 0;
+  $('#gsum').innerHTML = group==='sp500' && !SP.length ? 'กำลังโหลดรายชื่อ S&amp;P 500…'
+    : chs.length ? `${esc(GROUPS[group].name)}${group==='sp500'?` (${all.length} บริษัท)`:''} · เฉลี่ย <b class="${sgn(avg)}">${fpc(avg)}</b> · ขึ้น <span class="upc">${chs.filter(v=>v>=0).length}</span> ลง <span class="dnc">${chs.filter(v=>v<0).length}</span>`
+    : esc(GROUPS[group].name);
+  renderSectors();
+  const L = visible();
+  $('#wl').innerHTML = L.length ? L.map(s=>{ const q=wq[s], ch=chgOf(s), m=SPMAP[s];
+    const nm = m?.name || NAMES[s] || '';
+    return `<div class="wrow"><button type="button" class="wi${s===sym?' on':''}" data-s="${esc(s)}"><span><b>${esc(s)}</b><span class="nm">${esc(nm)}</span>${group==='sp500'&&m?`<span class="sx">${esc(SECTOR_TH[m.sector]||m.sector)}</span>`:''}</span>${spark(q?.closes,q?.prev)}<span class="q"><b class="num">${fp(q?.price)}</b><span class="num ${ch==null?'':sgn(ch)}">${ch==null?'…':fpc(ch)}</span></span></button>${group==='mine'?`<button type="button" class="x" data-x="${esc(s)}" aria-label="ลบ ${esc(s)}">×</button>`:''}</div>`; }).join('')
+    : `<p class="mute">${group==='mine'?'ยังไม่มีหุ้นในรายการ ค้นหาหุ้นแล้วกด “+ เพิ่มในรายการของฉัน”':group==='sp500'&&SP.length?'ไม่พบหุ้นที่ตรงกับตัวกรอง':'กำลังโหลด…'}</p>`;
 }
 $('#wl').addEventListener('click',e=>{
   const x=e.target.closest('[data-x]'); if(x){ watch=watch.filter(s=>s!==x.dataset.x); store.set('watch',watch); renderWatch(); starBtn(); return; }
-  const b=e.target.closest('[data-s]'); if(b) select(b.dataset.s);
+  const b=e.target.closest('[data-s]'); if(b){ select(b.dataset.s); if (matchMedia('(max-width:900px)').matches) scrollTo({top:0,behavior:'smooth'}); }
 });
 $('#groups').addEventListener('click',e=>{const g=e.target.closest('button')?.dataset.g; if(!g)return; group=g; store.set('group',g); renderWatch(); refreshWatch();});
+$('#sec').addEventListener('click',e=>{const b=e.target.closest('[data-sec]'); if(!b)return; const s=$('#spsec'); s.value = s.value===b.dataset.sec ? '' : b.dataset.sec; renderWatch();});
+let spT; $('#spq').addEventListener('input',()=>{clearTimeout(spT); spT=setTimeout(renderWatch,150)});
+$('#spsec').addEventListener('change',renderWatch); $('#spsort').addEventListener('change',renderWatch);
+async function loadSP(){
+  if (SP.length) return;
+  try{
+    const j = await (await api('type=sp500')).json();
+    SP = j.members || []; SPMAP = Object.fromEntries(SP.map(m=>[m.symbol,m])); GROUPS.sp500.list = SP.map(m=>m.symbol);
+    const secs=[...new Set(SP.map(m=>m.sector))].sort((a,b)=>(SECTOR_TH[a]||a).localeCompare(SECTOR_TH[b]||b,'th'));
+    $('#spsec').innerHTML = '<option value="">ทุกกลุ่มอุตสาหกรรม</option>' + secs.map(s=>`<option value="${esc(s)}">${esc(SECTOR_TH[s]||s)}</option>`).join('');
+  }catch(e){ $('#gsum').textContent = 'โหลดรายชื่อ S&P 500 ไม่สำเร็จ: '+e.message; }
+}
 async function refreshWatch(){
-  await Promise.allSettled(glist().map(s=>getChart(s,'1d','5m').then(r=>{wq[s]=r})));
+  if (group==='sp500') await loadSP();
+  const L = glist(), chunks=[]; for (let i=0;i<L.length;i+=100) chunks.push(L.slice(i,i+100));
+  await Promise.allSettled(chunks.map(async c=>{
+    const j = await (await api('type=quotes&symbols='+c.map(encodeURIComponent).join(','))).json();
+    for (const q of j.quotes||[]) wq[q.symbol] = q;
+  }));
   renderWatch();
 }
 

@@ -1,4 +1,4 @@
-// Proxy to Yahoo Finance (chart, symbol search, news) for the US Stock Tracker page.
+// Proxy to Yahoo Finance (chart, symbol search, news, batch quotes) + S&P 500 list from Wikipedia for the US Stock Tracker page.
 // Thai translation of news is done in the browser (translation services block server IPs).
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36';
 const RANGES = new Set(['1d','5d','1mo','3mo','6mo','1y','2y','5y','max']);
@@ -74,6 +74,56 @@ async function getNews(symbol: string, name: string) {
   return items;
 }
 
+/* ---------- S&P 500 constituents (Wikipedia, cached 12h) ---------- */
+type Member = { symbol: string; name: string; sector: string; industry: string };
+let spCache: { t: number; list: Member[] } | null = null;
+const strip = (h: string) => decode(h).replace(/\[\d+\]/g, '').trim();
+async function sp500(): Promise<Member[]> {
+  if (spCache && Date.now() - spCache.t < 12 * 3600 * 1000) return spCache.list;
+  const r = await fetch('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies', { headers: { 'User-Agent': 'USStockTracker/1.0 (personal dashboard)' } });
+  const html = await r.text();
+  const start = html.indexOf('id="constituents"');
+  if (start < 0) throw new Error('constituents table not found');
+  const table = html.slice(start, html.indexOf('</table>', start));
+  const list: Member[] = [];
+  for (const m of table.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/g)) {
+    const cells = [...m[1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map((c) => strip(c[1]));
+    if (cells.length >= 4 && /^[A-Z.\-]{1,6}$/.test(cells[0])) list.push({ symbol: cells[0].replace('.', '-'), name: cells[1], sector: cells[2], industry: cells[3] });
+  }
+  if (list.length < 450) throw new Error('unexpected constituent count ' + list.length);
+  spCache = { t: Date.now(), list };
+  return list;
+}
+
+/* ---------- batch quotes via Yahoo spark (20 symbols per call) ---------- */
+type Q = { symbol: string; price: number | null; prev: number | null; closes: number[] };
+async function sparkChunk(syms: string[]): Promise<Q[]> {
+  const r = await yget(`/v8/finance/spark?symbols=${syms.map(encodeURIComponent).join(',')}&range=1d&interval=5m`);
+  if (!r.ok) return [];
+  const j: any = r.j; const out: Q[] = [];
+  const thin = (a: (number | null)[]) => { const v = a.filter((x): x is number => x != null); const step = Math.max(1, Math.ceil(v.length / 40)); return v.filter((_, i) => i % step === 0 || i === v.length - 1).map((x) => +x.toFixed(4)); };
+  if (j.spark?.result) {
+    for (const it of j.spark.result) {
+      const res = it.response?.[0]; if (!res) continue;
+      const c = res.indicators?.quote?.[0]?.close || [];
+      out.push({ symbol: it.symbol, price: res.meta?.regularMarketPrice ?? null, prev: res.meta?.chartPreviousClose ?? res.meta?.previousClose ?? null, closes: thin(c) });
+    }
+  } else {
+    for (const [sym, v] of Object.entries<any>(j)) {
+      if (!v || !Array.isArray(v.close)) continue;
+      const c = thin(v.close);
+      out.push({ symbol: sym, price: c.length ? c[c.length - 1] : null, prev: v.chartPreviousClose ?? v.previousClose ?? null, closes: c });
+    }
+  }
+  return out;
+}
+async function quotes(syms: string[]) {
+  const chunks: string[][] = []; for (let i = 0; i < syms.length; i += 20) chunks.push(syms.slice(i, i + 20));
+  const out: Q[] = [];
+  for (let i = 0; i < chunks.length; i += 6) (await Promise.all(chunks.slice(i, i + 6).map(sparkChunk))).forEach((a) => out.push(...a));
+  return out;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   const u = new URL(req.url);
@@ -88,6 +138,16 @@ Deno.serve(async (req) => {
       .filter((x: any) => x.symbol && ['EQUITY', 'ETF', 'INDEX'].includes(x.quoteType))
       .map((x: any) => ({ symbol: x.symbol, name: x.shortname || x.longname || '', exch: x.exchDisp || '', type: x.typeDisp || x.quoteType }));
     return json({ quotes }, 200, { 'Cache-Control': 'max-age=300' });
+  }
+
+  if (type === 'sp500') {
+    try { return json({ updated: spCache?.t ?? Date.now(), members: await sp500() }, 200, { 'Cache-Control': 'max-age=3600' }); }
+    catch (e) { return json({ error: (e as Error).message, members: [] }, 502); }
+  }
+  if (type === 'quotes') {
+    const syms = [...new Set((u.searchParams.get('symbols') || '').toUpperCase().split(',').map((x) => x.trim()).filter((x) => SYM.test(x)))].slice(0, 120);
+    if (!syms.length) return json({ quotes: [] });
+    return json({ quotes: await quotes(syms) }, 200, { 'Cache-Control': 'max-age=30' });
   }
 
   const symbol = (u.searchParams.get('symbol') || 'AAPL').trim().toUpperCase();
