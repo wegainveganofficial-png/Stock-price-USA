@@ -107,6 +107,17 @@ h1{margin:4px 0 0;font-size:clamp(24px,3.4vw,40px);line-height:1.05;text-wrap:ba
 .btn{border:0;border-radius:10px;background:var(--ink);color:var(--bg);padding:0 16px;height:44px;cursor:pointer;font-weight:600}
 .sotd details{font-size:13px;color:var(--mute);margin-top:8px}
 @media(max-width:700px){.sotd{grid-template-columns:minmax(0,1fr)}}
+.champ{margin-top:20px}
+.cctl{display:flex;gap:12px;flex-wrap:wrap;align-items:end;margin:10px 0 12px}
+.cctl label{display:grid;gap:4px;font-size:13px;color:var(--mute)}
+.cctl input[type=number]{height:44px;width:150px;border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:0 10px;font-size:16px;color:var(--ink)}
+.cctl .chk{color:var(--ink)}
+.ctab{width:100%;font-size:14px;min-width:860px}
+.ctab td,.ctab th{white-space:nowrap}
+.ctab tbody tr{cursor:pointer}.ctab tbody tr:hover td{background:var(--sea)}
+.rsb{display:inline-block;min-width:34px;text-align:center;border-radius:6px;padding:1px 6px;font-weight:700;color:#fff}
+.tagv{font-size:12px;padding:1px 6px;border-radius:99px;background:var(--acc);color:#fff;margin-left:6px}
+.crit{display:flex;gap:2px}.crit i{width:8px;height:8px;border-radius:2px;display:block}
 #legend{position:absolute;z-index:3;left:12px;top:8px;font-size:13px;pointer-events:none;display:flex;gap:10px;flex-wrap:wrap;background:color-mix(in srgb,var(--panel) 80%,transparent);padding:2px 6px;border-radius:6px}
 #err{position:absolute;z-index:4;inset:0;display:grid;place-items:center;text-align:center;padding:24px;background:var(--panel);color:var(--down)}
 #err[hidden]{display:none}
@@ -216,6 +227,24 @@ footer{max-width:1320px;margin:0 auto;padding:8px max(4vw,16px) 40px;font-size:1
       <div id="hm"><p class="mute" style="padding:16px;color:#cfd8dc">กำลังโหลด heat map…</p></div>
     </div>
     <div id="hmtip" hidden></div>
+    <div class="card champ">
+      <h2>Champion Screen · Trend Template ของ Mark Minervini</h2>
+      <p class="mute small" id="cnote" style="margin:0">กำลังคัดกรอง S&amp;P 500…</p>
+      <div class="cctl">
+        <label>เงินในพอร์ต (USD)<input type="number" id="ceq" min="0" step="100" inputmode="decimal"></label>
+        <label>ความเสี่ยงต่อไม้ (% ของพอร์ต)<input type="number" id="crisk" min="0.1" max="5" step="0.25" inputmode="decimal"></label>
+        <label class="chk"><input type="checkbox" id="cvcp"> เฉพาะที่ราคาบีบตัวแคบ (VCP)</label>
+        <label class="chk"><input type="checkbox" id="cnear"> แสดงตัวที่ผ่าน 7/8 ด้วย</label>
+      </div>
+      <div class="scroll"><table class="ctab" id="ctab"></table></div>
+      <details class="small mute" style="margin-top:10px"><summary>เกณฑ์และวิธีคำนวณ</summary>
+        <p><b>Trend Template 8 ข้อ:</b> ① ราคาอยู่เหนือ SMA150 และ SMA200 ② SMA150 &gt; SMA200 ③ SMA200 ชี้ขึ้นอย่างน้อย 1 เดือน ④ SMA50 อยู่เหนือ SMA150 และ SMA200 ⑤ ราคาอยู่เหนือ SMA50 ⑥ ราคาสูงกว่าจุดต่ำสุด 52 สัปดาห์อย่างน้อย 30% ⑦ ห่างจุดสูงสุด 52 สัปดาห์ไม่เกิน 25% ⑧ RS ≥ 70</p>
+        <p><b>RS (1–99):</b> จัดอันดับผลตอบแทน 12 เดือนเทียบกับหุ้นทุกตัวใน S&amp;P 500 ให้น้ำหนักไตรมาสล่าสุด 40% และอีก 3 ไตรมาสก่อนหน้าไตรมาสละ 20% (แนวเดียวกับ IBD)</p>
+        <p><b>VCP (ประมาณการ):</b> ช่วงราคาปิดของ 3 ช่วง ช่วงละ 15 วัน แคบลงตามลำดับ และช่วงล่าสุดแกว่งไม่เกิน 10% · ข้อมูลฟรีไม่มีราคาสูง/ต่ำและวอลุ่มรายตัวแบบชุดใหญ่ จึงยังไม่ได้ตรวจวอลุ่มแห้งตัว</p>
+        <p><b>Pivot / จุดตัดขาดทุน:</b> Pivot = ราคาปิดสูงสุด 15 วันล่าสุด · จุดตัดขาดทุน = ราคาปิดต่ำสุด 10 วัน แต่ไม่ห่างจากราคาเกิน 8% · จำนวนหุ้น = (เงินพอร์ต × ความเสี่ยงต่อไม้) ÷ (ราคา − จุดตัดขาดทุน) และไม่เกิน 25% ของพอร์ตต่อตัว</p>
+        <p>ยังไม่ได้รวมเกณฑ์พื้นฐาน (กำไรและยอดขายเร่งตัว) ตามระบบ SEPA ฉบับเต็ม · ใช้ราคาปิดรายวัน 1 ปีจาก Yahoo Finance คำนวณใหม่ทุก 1 ชั่วโมง · เป็นตัวกรองทางเทคนิค ไม่ใช่คำแนะนำการลงทุน</p>
+      </details>
+    </div>
     <div class="card news">
       <div class="nhead"><h2>ข่าวล่าสุด <span id="nsym"></span></h2><span class="mute small">แปลเป็นภาษาไทยอัตโนมัติ · ต้นฉบับภาษาอังกฤษจาก Yahoo Finance</span></div>
       <div id="news" class="nlist"></div>
@@ -678,6 +707,36 @@ async function loadPick(){
 }
 $('#sotd').addEventListener('click',e=>{const b=e.target.closest('[data-s]'); if(b) select(b.dataset.s);});
 
+/* ---------- champion screen (Minervini Trend Template) ---------- */
+let CH = null;
+const ceq = $('#ceq'), crisk = $('#crisk'), cvcp = $('#cvcp'), cnear = $('#cnear');
+ceq.value = store.get('ceq', 10000); crisk.value = store.get('crisk', 1); cvcp.checked = store.get('cvcp', false); cnear.checked = store.get('cnear', false);
+const rsCol = v => v>=90 ? '#0f9957' : v>=80 ? '#3a9d6b' : v>=70 ? '#6f8f3a' : '#8a6d3b';
+function renderChamp(){
+  if (!CH) return;
+  const eq = Math.max(0, +ceq.value || 0), rk = Math.min(5, Math.max(0.1, +crisk.value || 1)) / 100;
+  let L = [...CH.rows, ...(cnear.checked ? CH.near : [])];
+  if (cvcp.checked) L = L.filter(r=>r.vcp);
+  const pc = v => (v>=0?'+':'')+(v*100).toFixed(1)+'%';
+  $('#cnote').innerHTML = `ผ่านครบ 8/8 เกณฑ์ <b>${CH.passed}</b> ตัว จาก ${CH.universe} ตัวใน S&amp;P 500 · ในนี้ราคาบีบตัวแบบ VCP <b>${CH.rows.filter(r=>r.vcp).length}</b> ตัว · เรียงตาม RS · กดแถวเพื่อเปิดกราฟ · คำนวณเมื่อ ${esc(tfmt(Math.floor(CH.asOf/1000),'Asia/Bangkok',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}))} น.`;
+  $('#ctab').innerHTML = `<thead><tr><th>หุ้น</th><th>เกณฑ์</th><th class="r">RS</th><th class="r">ราคา</th><th class="r">ห่างจุดสูง 52w</th><th class="r">เหนือจุดต่ำ 52w</th><th class="r">แกว่ง 10 วัน</th><th class="r">Pivot</th><th class="r">ตัดขาดทุน</th><th class="r">จำนวนหุ้น</th><th class="r">มูลค่า (% พอร์ต)</th></tr></thead><tbody>`
+   + (L.length ? L.map(r=>{
+      const per = r.price - r.stop, sh = per>0 ? Math.floor(Math.min(eq*rk/per, eq*0.25/r.price)) : 0, val = sh*r.price;
+      const crit = r.crit.map((ok,i)=>`<i title="เกณฑ์ข้อ ${i+1}" style="background:${ok?'var(--up)':'var(--down)'}"></i>`).join('');
+      return `<tr data-s="${esc(r.symbol)}"><td><b>${esc(r.symbol)}</b>${r.vcp?'<span class="tagv">VCP</span>':''}<br><span class="mute small">${esc((r.name||'').slice(0,26))} · ${esc(SECTOR_TH[r.sector]||r.sector||'')}</span></td><td><span class="crit">${crit}</span><span class="small mute">${r.met}/8</span></td><td class="r"><span class="rsb" style="background:${rsCol(r.rs)}">${r.rs}</span></td><td class="r">${fp(r.price)}</td><td class="r">${pc(r.fromHigh)}</td><td class="r">${pc(r.aboveLow)}</td><td class="r">${(r.tight10*100).toFixed(1)}%</td><td class="r">${fp(r.pivot)}</td><td class="r">${fp(r.stop)} <span class="dnc small">−${(r.risk*100).toFixed(1)}%</span></td><td class="r">${sh.toLocaleString('en-US')}</td><td class="r">$${Math.round(val).toLocaleString('en-US')} <span class="mute small">(${eq?(val/eq*100).toFixed(1):'0'}%)</span></td></tr>`; }).join('')
+     : `<tr><td colspan="11" class="mute">ไม่มีหุ้นที่ตรงกับตัวกรอง${cvcp.checked?' ลองปิดตัวกรอง VCP':''}</td></tr>`) + '</tbody>';
+}
+async function loadChamp(){
+  try{
+    const j = await (await api('type=champion')).json();
+    if (j.error) throw new Error(j.error);
+    CH = j; renderChamp();
+  }catch(e){ $('#cnote').innerHTML = `<span class="dnc">คัดกรองไม่สำเร็จ: ${esc(e.message)}</span>`; }
+}
+for (const [el,k] of [[ceq,'ceq'],[crisk,'crisk']]) el.addEventListener('input',()=>{ store.set(k, +el.value); renderChamp(); });
+for (const [el,k] of [[cvcp,'cvcp'],[cnear,'cnear']]) el.addEventListener('change',()=>{ store.set(k, el.checked); renderChamp(); });
+$('#ctab').addEventListener('click',e=>{const t=e.target.closest('[data-s]'); if(t){ select(t.dataset.s); scrollTo({top:0,behavior:'smooth'}); }});
+
 /* ---------- heat map (squarified treemap) ---------- */
 let CAPS = {}, hmSize = store.get('hmsize','cap');
 function squarify(items, x, y, w, h){
@@ -750,7 +809,8 @@ addEventListener('hashchange',()=>{const s=decodeURIComponent(location.hash.slic
 setInterval(()=>{ if(!document.hidden && ok) load(false); },30000);
 setInterval(()=>{ if(!document.hidden) refreshWatch(); },60000);
 setInterval(()=>{ if(!document.hidden) loadNews(true); },600000);
-loadHeat(); loadBBG(); loadPick();
+loadHeat(); loadBBG(); loadPick(); loadChamp();
+setInterval(()=>{ if(!document.hidden) loadChamp(); },3600000);
 setInterval(()=>{ if(!document.hidden) loadPick(); },3600000);
 setInterval(()=>{ if(!document.hidden) loadHeat(); },60000);
 setInterval(()=>{ if(!document.hidden) loadBBG(); },600000);

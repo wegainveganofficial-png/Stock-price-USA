@@ -10,6 +10,7 @@
 - ข่าวล่าสุดของแต่ละหุ้นจาก Yahoo Finance แปลเป็นภาษาไทยอัตโนมัติ
 - Heat map S&P 500 (ขนาดตามมูลค่าตลาด สีตาม % เปลี่ยนแปลง แยกตามกลุ่มอุตสาหกรรม)
 - หัวข่าว Bloomberg (RSS สาธารณะ) แปลไทย
+- Champion Screen: Trend Template 8 ข้อของ Mark Minervini + RS rating + VCP (ประมาณการ) + ตัวคำนวณจุดตัดขาดทุนและขนาดไม้
 - หุ้นเด่นประจำวัน: สัญญาณทางเทคนิคจากการคัดกรอง S&P 500 ตามกฎที่เปิดเผย (ไม่ใช่คำแนะนำการลงทุน)
 
 ## แหล่งข้อมูล (ฟรี ไม่ต้องใช้ API key)
@@ -27,7 +28,7 @@
 
 ```
 index.html                        หน้าเว็บ (static) — เปิดตรงหรือ deploy ที่ใดก็ได้
-supabase/functions/yahoo/index.ts Edge Function: ?type=chart|search|news|quotes|sp500|caps|bloomberg|pick
+supabase/functions/yahoo/index.ts Edge Function: ?type=chart|search|news|quotes|sp500|caps|bloomberg|pick|champion
 ```
 
 Supabase project: `vyutsvlusxyuoqjxxusi` (Stock Price) — หน้าเว็บใช้ anon key ซึ่งเป็น public key ตามปกติของ Supabase

@@ -1,4 +1,4 @@
-// Proxy to Yahoo Finance (chart, symbol search, news, batch quotes) + S&P 500 list (Wikipedia) + market caps + Bloomberg RSS headlines + stock-of-the-day screen for the US Stock Tracker page.
+// Proxy to Yahoo Finance (chart, symbol search, news, batch quotes) + S&P 500 list (Wikipedia) + market caps + Bloomberg RSS headlines + stock-of-the-day screen + Minervini champion screen for the US Stock Tracker page.
 // Thai translation of news is done in the browser (translation services block server IPs).
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36';
 const RANGES = new Set(['1d','5d','1mo','3mo','6mo','1y','2y','5y','max']);
@@ -171,12 +171,12 @@ async function bloomberg(feed: string) {
 }
 
 /* ---------- Stock of the day: rule-based screen over the S&P 500 (cached 1h) ---------- */
-async function dailyCloses(syms: string[]) {
+async function dailyCloses(syms: string[], range = '6mo') {
   const out: Record<string, number[]> = {};
   const chunks: string[][] = []; for (let i = 0; i < syms.length; i += 20) chunks.push(syms.slice(i, i + 20));
   for (let i = 0; i < chunks.length; i += 6) {
     await Promise.all(chunks.slice(i, i + 6).map(async (c) => {
-      const r = await yget(`/v8/finance/spark?symbols=${c.map(encodeURIComponent).join(',')}&range=6mo&interval=1d`);
+      const r = await yget(`/v8/finance/spark?symbols=${c.map(encodeURIComponent).join(',')}&range=${range}&interval=1d`);
       if (!r.ok) return; const j: any = r.j;
       if (j.spark?.result) { for (const it of j.spark.result) { const q = it.response?.[0]?.indicators?.quote?.[0]?.close; if (q) out[it.symbol] = q.filter((x: any) => x != null); } }
       else for (const [k, v] of Object.entries<any>(j)) if (Array.isArray(v?.close)) out[k] = v.close.filter((x: any) => x != null);
@@ -215,6 +215,46 @@ async function stockOfDay() {
   return data;
 }
 
+/* ---------- Champion screen: Minervini Trend Template + RS rating over the S&P 500 (cached 1h) ---------- */
+const smaAt = (c: number[], n: number, end: number) => avg(c.slice(end - n, end));
+let champCache: { t: number; data: unknown } | null = null;
+async function champion() {
+  if (champCache && Date.now() - champCache.t < 3600 * 1000) return champCache.data;
+  const list = await sp500(); const meta = Object.fromEntries(list.map((m) => [m.symbol, m]));
+  const closes = await dailyCloses(list.map((m) => m.symbol), '1y');
+  // IBD-style RS: 40% last quarter + 20% each of the three earlier quarters, ranked 1-99 across the universe
+  const raw: { s: string; v: number }[] = [];
+  for (const [s, c] of Object.entries(closes)) {
+    if (c.length < 230) continue;
+    const n = c.length, p = c[n - 1], q = (k: number) => c[Math.max(0, n - 1 - 63 * k)];
+    raw.push({ s, v: 0.4 * (p / q(1)) + 0.2 * (p / q(2)) + 0.2 * (p / q(3)) + 0.2 * (p / q(4)) });
+  }
+  raw.sort((a, b) => a.v - b.v);
+  const rs: Record<string, number> = {}; raw.forEach((r, i) => { rs[r.s] = Math.max(1, Math.min(99, Math.round(((i + 1) / raw.length) * 99))); });
+  const rows: any[] = [];
+  for (const { s } of raw) {
+    const c = closes[s], n = c.length, p = c[n - 1];
+    const s50 = smaAt(c, 50, n), s150 = smaAt(c, 150, n), s200 = smaAt(c, 200, n), s200m = smaAt(c, 200, n - 22);
+    const last252 = c.slice(-252), hi = Math.max(...last252), lo = Math.min(...last252);
+    const crit = [p > s150 && p > s200, s150 > s200, s200 > s200m, s50 > s150 && s50 > s200, p > s50, p >= lo * 1.3, p >= hi * 0.75, rs[s] >= 70];
+    const met = crit.filter(Boolean).length;
+    // Volatility contraction (closes only): price range of three consecutive 15-day windows, each tighter than the last
+    const rg = (a: number[]) => Math.max(...a) / Math.min(...a) - 1;
+    const w = [rg(c.slice(n - 45, n - 30)), rg(c.slice(n - 30, n - 15)), rg(c.slice(n - 15))];
+    const tight10 = rg(c.slice(-10));
+    const vcp = w[0] > w[1] && w[1] > w[2] && w[2] < 0.1;
+    const pivot = Math.max(...c.slice(-15));
+    const stop = Math.max(Math.min(...c.slice(-10)), p * 0.92);
+    rows.push({ symbol: s, name: meta[s]?.name, sector: meta[s]?.sector, price: p, rs: rs[s], met, crit, s50, s150, s200,
+      fromHigh: p / hi - 1, aboveLow: p / lo - 1, hi52: hi, lo52: lo, tight10, contractions: w, vcp, pivot, stop, risk: 1 - stop / p });
+  }
+  const pass = rows.filter((r) => r.met === 8).sort((a, b) => b.rs - a.rs);
+  const near = rows.filter((r) => r.met === 7).sort((a, b) => b.rs - a.rs).slice(0, 15);
+  const data = { asOf: Date.now(), universe: rows.length, passed: pass.length, rows: pass, near };
+  champCache = { t: Date.now(), data };
+  return data;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   const u = new URL(req.url);
@@ -241,6 +281,10 @@ Deno.serve(async (req) => {
     if (!BBG[feed]) return json({ error: 'unknown feed' }, 400);
     try { return json({ feed, items: await bloomberg(feed) }, 200, { 'Cache-Control': 'max-age=300' }); }
     catch (e) { return json({ error: (e as Error).message, items: [] }, 502); }
+  }
+  if (type === 'champion') {
+    try { return json(await champion(), 200, { 'Cache-Control': 'max-age=900' }); }
+    catch (e) { return json({ error: (e as Error).message }, 502); }
   }
   if (type === 'pick') {
     try { return json(await stockOfDay(), 200, { 'Cache-Control': 'max-age=900' }); }
