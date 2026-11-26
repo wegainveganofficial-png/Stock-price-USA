@@ -13,6 +13,7 @@
 - Champion Screen: Trend Template 8 ข้อของ Mark Minervini + RS rating + VCP (ประมาณการ) + ตัวคำนวณจุดตัดขาดทุนและขนาดไม้
 - จำลองการเทรดรายวันสไตล์ Minervini (Think & Trade Like a Champion): ย้อนหลัง 3/6/12 เดือน และ paper trade เริ่ม 27 พ.ย. 2026 เทียบ SPY/QQQ พร้อมตัวเลือก ETF ขาลง SH/PSQ/SQQQ
 - ตารางสรุปผลการเทรดแยกตามกลยุทธ์ (Minervini ล้วน / + SH / + PSQ / + SQQQ) พร้อมดาวน์โหลด Excel
+- ตาราง ROI ตาม Stop Loss (Think & Trade Like a Champion รูปที่ 3-1) ปรับ G/L ratio, จำนวนเทรด, ความแม่นยำ พร้อมอัตราชนะจริงจากการจำลอง และปุ่มนำ Stop loss ไปทดลองในการจำลอง
 - แท็บ ETF ขาลง (Inverse): SH, PSQ, DOG, RWM, SDS, QID, SPXU, SQQQ
 - หุ้นเด่นประจำวัน: สัญญาณทางเทคนิคจากการคัดกรอง S&P 500 ตามกฎที่เปิดเผย (ไม่ใช่คำแนะนำการลงทุน)
 

@@ -308,7 +308,7 @@ async function simUniverse() {
   simData = { t: Date.now(), d };
   return d;
 }
-type SimOpts = { start: number; capital: number; risk: number; maxPos: number; short: string; shortAlloc: number; strig: string; cost: number };
+type SimOpts = { start: number; capital: number; risk: number; maxPos: number; short: string; shortAlloc: number; strig: string; stop: number; tp: number; cost: number };
 function runSim(d: any, o: SimOpts) {
   const { dates, syms, P, first, ind, etf } = d; const T = dates.length;
   const at = new Map<string, number>(syms.map((s: string, i: number) => [s, i]));
@@ -343,8 +343,8 @@ function runSim(d: any, o: SimOpts) {
       if (p.kind === 'short') { if (px <= p.stop) sell(p, t, p.sh, 'ตัดขาดทุน ETF ขาลง'); else if (!shortOn) sell(p, t, p.sh, 'ตลาดพ้นขาลง'); continue; }
       if (px <= p.stop) { sell(p, t, p.sh, p.stop >= p.entry ? 'ขายที่จุดคุ้มทุน/ล็อกกำไร' : 'ตัดขาดทุน'); continue; }
       const g = px / p.entry - 1;
-      if (g >= 0.10 && p.stop < p.entry) { p.stop = p.entry; }
-      if (g >= 0.20 && !p.half) { p.half = true; p.note = 'ขายครึ่งหนึ่งที่ +20%'; p.stop = Math.max(p.stop, p.entry * 1.05); sell(p, t, Math.floor(p.sh / 2), ''); }
+      if (g >= o.tp / 2 && p.stop < p.entry) { p.stop = p.entry; }
+      if (g >= o.tp && !p.half) { p.half = true; p.note = `ขายครึ่งหนึ่งที่ +${Math.round(o.tp * 100)}%`; p.stop = Math.max(p.stop, p.entry * (1 + o.tp / 4)); sell(p, t, Math.floor(p.sh / 2), ''); }
       if (pos.has(p.k) && p.half && px < ind[p.k].s50[t]) sell(p, t, p.sh, 'หลุด SMA50 หลังทำกำไร');
     }
     // inverse ETF hedge in a confirmed downtrend
@@ -368,7 +368,7 @@ function runSim(d: any, o: SimOpts) {
       for (const [, k] of cands) {
         if (longs >= o.maxPos) break;
         const a = P[k], px = a[t]; let m10 = Infinity; for (let i = t - 10; i < t; i++) m10 = Math.min(m10, a[i]);
-        const stop = Math.min(Math.max(m10, px * 0.92), px * 0.97), e = equityAt(t);
+        const stop = Math.min(Math.max(m10, px * (1 - o.stop)), px * (1 - Math.min(0.03, o.stop))), e = equityAt(t);
         const sh = Math.floor(Math.min(e * o.risk / (px - stop), e * 0.25 / px, cash / (px * (1 + o.cost))));
         if (sh < 1) continue;
         buy(k, t, sh, 'long', stop); longs++;
@@ -405,7 +405,8 @@ async function simulate(u: URL) {
     start: 0, capital: Math.min(1e9, Math.max(1000, +(u.searchParams.get('capital') || 100000))),
     risk: Math.min(0.05, Math.max(0.0025, +(u.searchParams.get('risk') || 1.25) / 100)),
     maxPos: Math.min(12, Math.max(1, Math.round(+(u.searchParams.get('maxpos') || 6)))),
-    short: SHORT_ETF[short] ? short : 'none', shortAlloc: Math.min(1, Math.max(0, +(u.searchParams.get('salloc') || 30) / 100)), strig: u.searchParams.get('strig') === 'confirmed' ? 'confirmed' : 'fast', cost: 0.001,
+    short: SHORT_ETF[short] ? short : 'none', shortAlloc: Math.min(1, Math.max(0, +(u.searchParams.get('salloc') || 30) / 100)), strig: u.searchParams.get('strig') === 'confirmed' ? 'confirmed' : 'fast',
+    stop: Math.min(0.3, Math.max(0.02, +(u.searchParams.get('stop') || 8) / 100)), tp: Math.min(1, Math.max(0.04, +(u.searchParams.get('tp') || 20) / 100)), cost: 0.001,
   };
   const T = d.dates.length, PAPER = '2026-11-27';
   if (period === 'paper') {
@@ -415,7 +416,7 @@ async function simulate(u: URL) {
   } else o.start = Math.max(253, T - (({ '3m': 63, '6m': 126, '1y': 252 } as Record<string, number>)[period] ?? 252));
   const key = JSON.stringify(o) + d.asOf;
   const c = simCache.get(key); if (c) return c.v;
-  const v = { ...runSim(d, o), params: { ...o, period, risk: o.risk * 100, shortAlloc: o.shortAlloc * 100 }, universe: d.universe, asOf: d.asOf, paperStart: PAPER };
+  const v = { ...runSim(d, o), params: { ...o, period, risk: o.risk * 100, shortAlloc: o.shortAlloc * 100, stop: o.stop * 100, tp: o.tp * 100 }, universe: d.universe, asOf: d.asOf, paperStart: PAPER };
   if (simCache.size > 50) simCache.clear(); simCache.set(key, { t: Date.now(), v });
   return v;
 }

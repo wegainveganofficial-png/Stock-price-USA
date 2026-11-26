@@ -127,6 +127,19 @@ h1{margin:4px 0 0;font-size:clamp(24px,3.4vw,40px);line-height:1.05;text-wrap:ba
 .xtab td small{display:block;color:var(--mute);font-size:12px}
 .btn2{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:10px;height:44px;padding:0 16px;cursor:pointer;font-weight:600}
 .btn2:disabled{opacity:.5;cursor:progress}
+.roi{margin-top:20px}
+.rtab{width:100%;font-size:15px;min-width:640px;font-variant-numeric:tabular-nums}
+.rtab th{background:var(--ink);color:var(--bg);font-weight:600;text-align:right;padding:8px 10px;white-space:normal;vertical-align:bottom}
+.rtab th:first-child,.rtab td:first-child{text-align:right}
+.rtab td{text-align:right;padding:6px 10px;white-space:nowrap}
+.rtab tbody tr{cursor:pointer}.rtab tbody tr:hover td{background:var(--sea)}
+.rtab td.best{background:var(--ink);color:var(--bg);font-weight:700}
+.rtab td.cur{outline:2px solid var(--acc);outline-offset:-2px}
+.rtab td.mine{background:color-mix(in srgb,var(--acc) 10%,transparent)}
+.ropt{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin:14px 0 0}
+.ropt div{border:1px solid var(--line);border-radius:12px;padding:10px 14px;background:var(--panel)}
+.ropt span{display:block;font-size:13px;color:var(--mute)}.ropt b{font-size:18px}
+.ropt.mine div{border-color:var(--acc)}
 .cctl{display:flex;gap:12px;flex-wrap:wrap;align-items:end;margin:10px 0 12px}
 .cctl label{display:grid;gap:4px;font-size:13px;color:var(--mute)}
 .cctl input[type=number]{height:44px;width:150px;border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:0 10px;font-size:16px;color:var(--ink)}
@@ -274,6 +287,8 @@ footer{max-width:1320px;margin:0 auto;padding:8px max(4vw,16px) 40px;font-size:1
         <label>ถือหุ้นพร้อมกันสูงสุด<input id="s_max" type="number" min="1" max="12" step="1" inputmode="numeric"></label>
         <label>ETF ขาลงตอนตลาดลง<select id="s_short"><option value="none">ไม่ใช้ (ถือเงินสด)</option><option value="SH">SH (−1x S&amp;P 500)</option><option value="PSQ">PSQ (−1x Nasdaq-100)</option><option value="SQQQ">SQQQ (−3x Nasdaq-100)</option></select></label>
         <label>สัดส่วน ETF ขาลง (% พอร์ต)<input id="s_salloc" type="number" min="5" max="100" step="5" inputmode="numeric"></label>
+        <label>Stop loss สูงสุด (%)<input id="s_stop" type="number" min="2" max="30" step="1" inputmode="decimal"></label>
+        <label>ขายครึ่งหนึ่งเมื่อกำไร (%)<input id="s_tp" type="number" min="4" max="100" step="1" inputmode="decimal"></label>
         <label>เข้า ETF ขาลงเมื่อ<select id="s_strig"><option value="fast">QQQ หลุด SMA50 (เร็ว)</option><option value="confirmed">ขาลงยืนยัน SMA50 &lt; SMA200</option></select></label>
       </div>
       <div class="kpis" id="skpi"></div>
@@ -286,8 +301,8 @@ footer{max-width:1320px;margin:0 auto;padding:8px max(4vw,16px) 40px;font-size:1
       <details class="small mute" style="margin-top:10px"><summary>กฎการเทรดและข้อจำกัด</summary>
         <p><b>สภาพตลาด (ใช้ QQQ):</b> ขาขึ้น = ราคา &gt; SMA50 &gt; SMA200 → เปิดไม้ซื้อใหม่ได้ · ขาลง = ราคา &lt; SMA50 &lt; SMA200 · นอกนั้น “ไม่ชัด” → ไม่เปิดไม้ใหม่ ถือเดิมตามจุดตัดขาดทุน</p>
         <p><b>ซื้อ:</b> หุ้นผ่าน Trend Template 8 ข้อ (RS ≥ 70) และปิดทะลุราคาสูงสุด 15 วันก่อนหน้า (pivot) โดยฐานแกว่งไม่เกิน 15% และไม่ไล่ราคาเกิน 5% เหนือ pivot · เลือก RS สูงสุดก่อน</p>
-        <p><b>ขนาดไม้:</b> เสี่ยงต่อไม้ตามที่ตั้ง (ค่าเริ่มต้น 1.25% ของพอร์ต) · จุดตัดขาดทุน = ราคาปิดต่ำสุด 10 วัน ไม่ห่างเกิน 8% และไม่ใกล้กว่า 3% · ไม่เกิน 25% ของพอร์ตต่อตัว</p>
-        <p><b>ขาย:</b> ตัดขาดทุนเมื่อปิดต่ำกว่าจุดตัดขาดทุน · กำไร 10% ขยับจุดตัดขาดทุนมาที่ทุน · กำไร 20% ขายครึ่งหนึ่งและล็อกกำไร 5% · ส่วนที่เหลือขายเมื่อปิดหลุด SMA50 · ตัดขาดทุนแล้วพักตัวนั้น 10 วัน</p>
+        <p><b>ขนาดไม้:</b> เสี่ยงต่อไม้ตามที่ตั้ง (ค่าเริ่มต้น 1.25% ของพอร์ต) · จุดตัดขาดทุน = ราคาปิดต่ำสุด 10 วัน ไม่ห่างเกินค่า Stop loss สูงสุด และไม่ใกล้กว่า 3% · ไม่เกิน 25% ของพอร์ตต่อตัว</p>
+        <p><b>ขาย:</b> ตัดขาดทุนเมื่อปิดต่ำกว่าจุดตัดขาดทุน (ไม่เกินค่า Stop loss สูงสุดที่ตั้ง ค่าเริ่มต้น 8%) · กำไรถึงครึ่งหนึ่งของเป้า ขยับจุดตัดขาดทุนมาที่ทุน · กำไรถึงเป้า (ค่าเริ่มต้น 20%) ขายครึ่งหนึ่งและล็อกกำไร ¼ ของเป้า · ส่วนที่เหลือขายเมื่อปิดหลุด SMA50 · ตัดขาดทุนแล้วพักตัวนั้น 10 วัน</p>
         <p><b>ETF ขาลง:</b> ซื้อตามสัดส่วนที่ตั้งเมื่อเข้าเงื่อนไข และขายเมื่อตลาดพ้นเงื่อนไข หรือขาดทุนเกิน 8% (SQQQ 15%) · ETF ชนิดเลเวอเรจ/ผกผันออกแบบมาสำหรับถือระยะสั้น มูลค่าเสื่อมเมื่อถือนานในตลาดผันผวน</p>
         <p><b>หมายเหตุ:</b> ตารางสรุปตามกลยุทธ์ด้านล่างใช้ช่วงเวลาและค่าตั้งเดียวกับการ์ดนี้</p>
         <p><b>ข้อจำกัด:</b> ซื้อขายที่ราคาปิด (Minervini ซื้อระหว่างวันตอนทะลุ pivot) · หักค่าธรรมเนียม+slippage 0.1% ต่อครั้ง · ไม่รวมปันผล · ใช้รายชื่อ S&amp;P 500 ปัจจุบันย้อนหลัง ทำให้ผลย้อนหลังดีเกินจริง (survivorship bias) · Paper trade นับจริงตั้งแต่ 27 พ.ย. 2026 ด้วยกฎเดียวกันทุกวัน ผลในอดีตไม่รับประกันอนาคต · ไม่ใช่คำแนะนำการลงทุน</p>
@@ -301,6 +316,25 @@ footer{max-width:1320px;margin:0 auto;padding:8px max(4vw,16px) 40px;font-size:1
       </div>
       <div class="scroll" style="margin-top:10px"><table class="xtab" id="xtab"></table></div>
       <p class="mute small" style="margin:8px 0 0">ไม้ที่ชนะ = ปิดแล้วมีกำไรหลังหักค่าธรรมเนียม · % คิดจากเงินที่ลงในไม้นั้น · ไม้ที่ขายครึ่งหนึ่งที่ +20% นับเป็น 1 ไม้ เมื่อขายส่วนที่เหลือ · ไฟล์ Excel มีชีตสรุปและชีตบันทึกการเทรดรายไม้ของแต่ละกลยุทธ์</p>
+    </div>
+    <div class="card roi">
+      <h2>ตารางผลตอบแทน (ROI) ตาม Stop Loss</h2>
+      <p class="mute small" style="margin:0 0 10px">ผลตอบแทนทบต้นจากการเทรด N ครั้ง เมื่อกำไรและขาดทุนต่อไม้คงที่ ตามแนวคิดใน “Think &amp; Trade Like a Champion” (รูปที่ 3-1) · สูตร (1 + %กำไร)<sup>ไม้ชนะ</sup> × (1 − %ขาดทุน)<sup>ไม้แพ้</sup> − 1 · ช่องสีเข้ม = ผลตอบแทนสูงสุดของแต่ละความแม่นยำ · กดแถวเพื่อนำ Stop loss และเป้ากำไรนั้นไปทดลองในการจำลอง</p>
+      <div class="sgrid">
+        <label>G/L Ratio (กำไร : ขาดทุน)<input id="r_ratio" type="number" min="0.5" max="10" step="0.5" inputmode="decimal"></label>
+        <label>จำนวนครั้งที่เทรด<input id="r_n" type="number" min="1" max="200" step="1" inputmode="numeric"></label>
+        <label>ความแม่นยำ ชุดที่ 1 (%)<input id="r_a1" type="number" min="1" max="99" step="1" inputmode="numeric"></label>
+        <label>ความแม่นยำ ชุดที่ 2 (%)<input id="r_a2" type="number" min="1" max="99" step="1" inputmode="numeric"></label>
+        <label>ความแม่นยำ ชุดที่ 3 (%)<input id="r_a3" type="number" min="1" max="99" step="1" inputmode="numeric"></label>
+      </div>
+      <div class="scroll"><table class="rtab" id="rtab"></table></div>
+      <div class="ropt" id="ropt"></div>
+      <div class="ropt mine" id="rmine"></div>
+      <details class="small mute" style="margin-top:10px"><summary>อ่านตารางนี้อย่างไร</summary>
+        <p>ทุกแถวใช้ G/L Ratio เดียวกัน (ค่าเริ่มต้น 2:1 คือกำไรเป็น 2 เท่าของขาดทุน) ต่างกันที่ขนาด Stop loss · Stop แคบไปจะได้กำไรต่อไม้น้อยจนไม่คุ้ม Stop กว้างไปขาดทุนแต่ละครั้งหนักจนทบต้นแล้วพอร์ตเสียหาย จึงมีจุดที่เหมาะที่สุดสำหรับแต่ละความแม่นยำ</p>
+        <p>จุดที่เหมาะที่สุดคำนวณจากสูตร %ขาดทุน = ความแม่นยำ − (1 − ความแม่นยำ) ÷ G/L Ratio เช่น ความแม่นยำ 40% และ 2:1 ได้ 40% − 60% ÷ 2 = 10% คือ Stop 10% เป้ากำไร 20% ตรงกับหนังสือ · ถ้าผลลัพธ์ ≤ 0 แปลว่าระบบนั้นขาดทุนทุกระดับ ต้องเพิ่มความแม่นยำหรือ G/L Ratio</p>
+        <p>ตารางสมมติว่าลงเงินเต็มจำนวนทุกไม้และกำไร/ขาดทุนเท่ากันทุกครั้ง ส่วนการจำลองด้านบนใช้การคุมขนาดไม้ตามความเสี่ยงและกำไร/ขาดทุนแต่ละไม้ไม่เท่ากัน ตัวเลขจึงไม่ตรงกันโดยตรง ใช้ตารางนี้เพื่อหาสัดส่วน Stop loss กับเป้ากำไรที่สมดุล แล้วทดสอบผลจริงในการจำลอง</p>
+      </details>
     </div>
     <div class="card news">
       <div class="nhead"><h2>ข่าวล่าสุด <span id="nsym"></span></h2><span class="mute small">แปลเป็นภาษาไทยอัตโนมัติ · ต้นฉบับภาษาอังกฤษจาก Yahoo Finance</span></div>
@@ -797,7 +831,7 @@ for (const [el,k] of [[cvcp,'cvcp'],[cnear,'cnear']]) el.addEventListener('chang
 $('#ctab').addEventListener('click',e=>{const t=e.target.closest('[data-s]'); if(t){ select(t.dataset.s); scrollTo({top:0,behavior:'smooth'}); }});
 
 /* ---------- Minervini daily trading simulation ---------- */
-const SIMF = {s_period:['speriod','1y'], s_cap:['scap',100000], s_risk:['srisk',1.25], s_max:['smax',6], s_short:['sshort','PSQ'], s_salloc:['ssalloc',30], s_strig:['sstrig','fast']};
+const SIMF = {s_period:['speriod','1y'], s_cap:['scap',100000], s_risk:['srisk',1.25], s_max:['smax',6], s_short:['sshort','PSQ'], s_salloc:['ssalloc',30], s_strig:['sstrig','fast'], s_stop:['sstop',8], s_tp:['stp',20]};
 for (const [id,[k,def]] of Object.entries(SIMF)) $('#'+id).value = store.get(k, def);
 let SIM = null, simT, simSeq = 0;
 const money = v => '$'+Math.round(v).toLocaleString('en-US');
@@ -828,7 +862,7 @@ function renderSim(){
   const j=SIM;
   if (j.pending){
     $('#skpi').innerHTML = `<div style="grid-column:1/-1"><span>Paper trade</span><b>เริ่มนับ ${esc(j.paperStart)}</b><small>ข้อมูลราคาปิดล่าสุด ${esc(j.lastDate)} (26 พ.ย. ตลาดสหรัฐปิดวันขอบคุณพระเจ้า) · ระบบจะเริ่มซื้อขายจำลองตั้งแต่วันทำการแรก แล้วอัปเดตทุกวันหลังตลาดปิด · ระหว่างนี้เลือก “ย้อนหลัง” เพื่อดูผลในอดีต</small></div>`;
-    $('#simtip').textContent=''; $('#sopen').innerHTML=''; $('#strades').innerHTML=''; $('#scount').textContent=''; drawSim(); return;
+    $('#simtip').textContent=''; $('#sopen').innerHTML=''; $('#strades').innerHTML=''; $('#scount').textContent=''; drawSim(); renderROI(); return;
   }
   const s=j.stats, endEq=j.equity.at(-1);
   const k=(lab,val,sub,cls='')=>`<div><span>${lab}</span><b class="${cls}">${val}</b>${sub?`<small>${sub}</small>`:''}</div>`;
@@ -847,14 +881,14 @@ function renderSim(){
   $('#strades').innerHTML = `<thead><tr><th>หุ้น</th><th>ซื้อ</th><th>ขาย</th><th class="r">วัน</th><th class="r">ราคาซื้อ</th><th class="r">ราคาขาย</th><th class="r">%</th><th class="r">กำไร/ขาดทุน</th><th>เหตุผลที่ขาย</th></tr></thead><tbody>`
     + (show.length ? show.map(t=>`<tr data-s="${esc(t.sym)}"><td><b>${esc(t.sym)}</b>${t.kind==='short'?' <span class="tagv">ขาลง</span>':''}</td><td>${esc(t.d0)}</td><td>${esc(t.d1)}</td><td class="r">${t.days}</td><td class="r">${fp(t.entry)}</td><td class="r">${fp(t.exit)}</td><td class="r ${sgn(t.pct)}">${pcs(t.pct)}</td><td class="r ${sgn(t.pnl)}">${t.pnl>=0?'+':'−'}${money(Math.abs(t.pnl))}</td><td>${esc(t.why)}${t.note?` <span class="mute small">· ${esc(t.note)}</span>`:''}</td></tr>`).join('')
       : `<tr><td colspan="9" class="mute">ยังไม่มีไม้ที่ปิด</td></tr>`) + '</tbody>';
-  drawSim(); simTipDefault();
+  drawSim(); simTipDefault(); renderROI();
 }
 async function runSimUI(){
   const seq=++simSeq;
   const v=id=>encodeURIComponent($('#'+id).value);
   $('#skpi').innerHTML = '<div style="grid-column:1/-1"><span>กำลังจำลอง…</span><b>⋯</b><small>ครั้งแรกอาจใช้เวลา 5–10 วินาทีเพื่อโหลดราคา 2 ปีของหุ้นทั้ง 500 ตัว</small></div>';
   try{
-    const j = await (await api(`type=sim&period=${v('s_period')}&capital=${v('s_cap')}&risk=${v('s_risk')}&maxpos=${v('s_max')}&short=${v('s_short')}&salloc=${v('s_salloc')}&strig=${v('s_strig')}`)).json();
+    const j = await (await api(`type=sim&period=${v('s_period')}&capital=${v('s_cap')}&risk=${v('s_risk')}&maxpos=${v('s_max')}&short=${v('s_short')}&salloc=${v('s_salloc')}&strig=${v('s_strig')}&stop=${v('s_stop')}&tp=${v('s_tp')}`)).json();
     if (seq!==simSeq) return;
     if (j.error) throw new Error(j.error);
     SIM=j; renderSim();
@@ -900,14 +934,14 @@ function renderStrat(){
   }
   $('#xtab').innerHTML = `<thead><tr><th>กลยุทธ์</th><th class="r">จำนวนครั้งที่เทรด</th><th class="r">% การเทรดที่ชนะ</th><th class="r">กำไรเฉลี่ย</th><th class="r">ขาดทุนเฉลี่ย</th><th class="r">กำไรเยอะสุด</th><th class="r">ขาดทุนเยอะสุด</th><th class="r">วันถือเฉลี่ย ไม้กำไร</th><th class="r">วันถือเฉลี่ย ไม้ขาดทุน</th><th class="r">กำไร/ขาดทุนรวม</th></tr></thead><tbody>${body}</tbody>`;
   const any = Object.values(XR.runs)[0];
-  $('#xnote').textContent = `ช่วง ${any.dates[0]} ถึง ${any.dates.at(-1)} · เงินเริ่มต้น ${money(any.params.capital)} · เสี่ยง ${any.params.risk}% ต่อไม้ · ถือสูงสุด ${any.params.maxPos} ตัว · ETF ขาลง ${any.params.shortAlloc}% ของพอร์ต (${any.params.strig==='fast'?'QQQ หลุด SMA50':'ขาลงยืนยัน'}) · นับเฉพาะไม้ที่ปิดแล้ว`;
+  $('#xnote').textContent = `ช่วง ${any.dates[0]} ถึง ${any.dates.at(-1)} · เงินเริ่มต้น ${money(any.params.capital)} · เสี่ยง ${any.params.risk}% ต่อไม้ · ถือสูงสุด ${any.params.maxPos} ตัว · Stop loss สูงสุด ${any.params.stop}% · ขายครึ่งที่ +${any.params.tp}% · ETF ขาลง ${any.params.shortAlloc}% ของพอร์ต (${any.params.strig==='fast'?'QQQ หลุด SMA50':'ขาลงยืนยัน'}) · นับเฉพาะไม้ที่ปิดแล้ว`;
   $('#xdl').disabled = false;
 }
 async function runStrat(){
   const seq = ++xSeq, v=id=>encodeURIComponent($('#'+id).value);
   $('#xdl').disabled = true; $('#xtab').innerHTML = '<tr><td class="mute">กำลังจำลองทั้ง 4 กลยุทธ์…</td></tr>';
   try{
-    const base = `type=sim&period=${v('s_period')}&capital=${v('s_cap')}&risk=${v('s_risk')}&maxpos=${v('s_max')}&salloc=${v('s_salloc')}&strig=${v('s_strig')}`;
+    const base = `type=sim&period=${v('s_period')}&capital=${v('s_cap')}&risk=${v('s_risk')}&maxpos=${v('s_max')}&salloc=${v('s_salloc')}&strig=${v('s_strig')}&stop=${v('s_stop')}&tp=${v('s_tp')}`;
     const res = await Promise.all(STRATS.map(s=>api(base+'&short='+s.id).then(r=>r.json())));
     if (seq!==xSeq) return;
     const bad = res.find(j=>j.error); if (bad) throw new Error(bad.error);
@@ -935,7 +969,7 @@ function buildWorkbook(X){
     ws2['!cols'] = th.map((_,i)=>({wch:[10,14,12,12,10,12,12,12,14,8,28,22][i]}));
     X.utils.book_append_sheet(wb, ws2, ('เทรด ' + (st.id==='none'?'Minervini':'Minervini+'+st.id)).slice(0,31));
   }
-  const ps = [['รายการ','ค่า'],['ช่วงเวลา', `${any.dates[0]} ถึง ${any.dates.at(-1)}`],['เงินเริ่มต้น (USD)', p.capital],['ความเสี่ยงต่อไม้ (%)', p.risk],['ถือหุ้นพร้อมกันสูงสุด', p.maxPos],['สัดส่วน ETF ขาลง (%)', p.shortAlloc],['เงื่อนไขเข้า ETF ขาลง', p.strig==='fast'?'QQQ หลุด SMA50':'ขาลงยืนยัน SMA50 < SMA200'],['ค่าธรรมเนียม+slippage ต่อครั้ง (%)', 0.1],['จำนวนหุ้นในจักรวาล', any.universe],['แหล่งข้อมูล','ราคาปิดรายวันจาก Yahoo Finance · รายชื่อ S&P 500 จาก Wikipedia'],['สร้างไฟล์เมื่อ', new Date().toLocaleString('th-TH',{timeZone:'Asia/Bangkok'})],['ข้อควรรู้','ผลจำลอง ซื้อขายที่ราคาปิด ไม่รวมปันผล ใช้รายชื่อ S&P 500 ปัจจุบันย้อนหลัง (survivorship bias) · ไม่ใช่คำแนะนำการลงทุน']];
+  const ps = [['รายการ','ค่า'],['ช่วงเวลา', `${any.dates[0]} ถึง ${any.dates.at(-1)}`],['เงินเริ่มต้น (USD)', p.capital],['ความเสี่ยงต่อไม้ (%)', p.risk],['ถือหุ้นพร้อมกันสูงสุด', p.maxPos],['Stop loss สูงสุด (%)', p.stop],['ขายครึ่งหนึ่งเมื่อกำไร (%)', p.tp],['สัดส่วน ETF ขาลง (%)', p.shortAlloc],['เงื่อนไขเข้า ETF ขาลง', p.strig==='fast'?'QQQ หลุด SMA50':'ขาลงยืนยัน SMA50 < SMA200'],['ค่าธรรมเนียม+slippage ต่อครั้ง (%)', 0.1],['จำนวนหุ้นในจักรวาล', any.universe],['แหล่งข้อมูล','ราคาปิดรายวันจาก Yahoo Finance · รายชื่อ S&P 500 จาก Wikipedia'],['สร้างไฟล์เมื่อ', new Date().toLocaleString('th-TH',{timeZone:'Asia/Bangkok'})],['ข้อควรรู้','ผลจำลอง ซื้อขายที่ราคาปิด ไม่รวมปันผล ใช้รายชื่อ S&P 500 ปัจจุบันย้อนหลัง (survivorship bias) · ไม่ใช่คำแนะนำการลงทุน']];
   const ws3 = X.utils.aoa_to_sheet(ps); ws3['!cols']=[{wch:32},{wch:70}];
   X.utils.book_append_sheet(wb, ws3, 'ค่าตั้งและแหล่งข้อมูล');
   return { wb, file: `minervini-trades_${any.dates[0]}_${any.dates.at(-1)}.xlsx` };
@@ -947,6 +981,43 @@ $('#xdl').addEventListener('click', async ()=>{
   finally{ b.textContent=t; b.disabled=false; }
 });
 for (const id of Object.keys(SIMF)) $('#'+id).addEventListener('change',()=>{ clearTimeout(window.__xT); window.__xT=setTimeout(runStrat,600); });
+
+/* ---------- ROI table by stop loss (Minervini fig. 3-1) ---------- */
+const ROIF = {r_ratio:['rratio',2], r_n:['rn',10], r_a1:['ra1',30], r_a2:['ra2',40], r_a3:['ra3',50]};
+for (const [id,[k,def]] of Object.entries(ROIF)) $('#'+id).value = store.get(k, def);
+const LOSSES = [2,3,4,6,7,8,10,12,15,18,21,24,27,30,35,40,45,50];
+const roiOf = (a, g, l, n) => (Math.pow(1+g, n*a) * Math.pow(1-l, n*(1-a)) - 1) * 100;
+const optLoss = (a, R) => a - (1-a)/R;
+function renderROI(){
+  const R = Math.max(0.1, +$('#r_ratio').value || 2), n = Math.max(1, Math.round(+$('#r_n').value || 10));
+  const accs = ['r_a1','r_a2','r_a3'].map(id=>Math.min(0.99, Math.max(0.01, (+$('#'+id).value||40)/100)));
+  const sim = SIM && !SIM.pending && SIM.stats && SIM.stats.winRate!=null ? SIM.stats : null;
+  const cols = accs.map(a=>({a, lab:`ความแม่นยำ ${Math.round(a*100)}%`}));
+  if (sim) cols.push({a: sim.winRate/100, lab:`ระบบของคุณ ${sim.winRate.toFixed(1)}%`, mine:true});
+  const grid = LOSSES.map(l=>({l, g:l*R, v:cols.map(c=>roiOf(c.a, l*R/100, l/100, n))}));
+  const best = cols.map((_,j)=>grid.reduce((bi,row,i)=>row.v[j]>grid[bi].v[j]?i:bi,0));
+  const curStop = +$('#s_stop').value, curTp = +$('#s_tp').value;
+  const f2 = v => (v>=0?'':'')+v.toFixed(2)+'%';
+  $('#rtab').innerHTML = `<thead><tr><th>% กำไร</th><th>% ขาดทุน</th><th>G/L Ratio</th>${cols.map(c=>`<th>${esc(c.lab)}</th>`).join('')}</tr></thead><tbody>`
+    + grid.map((row,i)=>`<tr data-l="${row.l}" data-g="${row.g}"><td class="${row.l===curStop&&Math.abs(row.g-curTp)<0.01?'cur':''}">${(+row.g.toFixed(2))}%</td><td>${row.l}%</td><td>${+R.toFixed(2)}:1</td>${row.v.map((v,j)=>`<td class="${best[j]===i?'best':(v<0?'dnc':'')} ${cols[j].mine&&best[j]!==i?'mine':''}">${f2(v)}</td>`).join('')}</tr>`).join('') + '</tbody>';
+  $('#ropt').innerHTML = accs.map(a=>{ const l=optLoss(a,R);
+    return l<=0 ? `<div><span>ความแม่นยำ ${Math.round(a*100)}% · ${+R.toFixed(2)}:1</span><b class="dnc">ขาดทุนทุกระดับ</b><span>ต้องเพิ่มความแม่นยำหรือ G/L Ratio</span></div>`
+      : `<div><span>ความแม่นยำ ${Math.round(a*100)}% · ${+R.toFixed(2)}:1 · จุดที่เหมาะที่สุด</span><b>Stop ${(l*100).toFixed(1)}% · เป้า ${(l*R*100).toFixed(1)}%</b><span>ROI ${n} ไม้ ≈ ${f2(roiOf(a,l*R,l,n))}</span></div>`; }).join('');
+  if (!sim){ $('#rmine').innerHTML = `<div><span>ระบบของคุณ</span><b>รอผลจำลอง</b><span>เลือกช่วง “ย้อนหลัง” ในการ์ดจำลองเพื่อใช้อัตราชนะจริง</span></div>`; return; }
+  const W = sim.winRate/100, G = (sim.avgWin||0)/100, L = Math.abs(sim.avgLoss||0)/100, Ra = L ? G/L : null;
+  const lo = Ra ? optLoss(W, Ra) : null, lr = optLoss(W, R);
+  const sugg = Math.min(15, Math.max(3, Math.round((lr>0?lr:0.03)*100)));
+  $('#rmine').innerHTML = `<div><span>ผลจำลองจริง (${esc(SIM.dates[0])} → ${esc(SIM.dates.at(-1))})</span><b>ชนะ ${sim.winRate.toFixed(1)}% · กำไร ${pcs(sim.avgWin)} / ขาดทุน ${pcs(sim.avgLoss)}</b><span>G/L Ratio จริง ${Ra?Ra.toFixed(2)+':1':'–'} · Stop สูงสุดที่ใช้ ${SIM.params.stop}% · ขายครึ่งที่ +${SIM.params.tp}%</span></div>`
+    + `<div><span>ROI ${n} ไม้ ด้วยค่าเฉลี่ยจริง</span><b class="${sgn(Ra?roiOf(W,G,L,n):0)}">${Ra?f2(roiOf(W,G,L,n)):'–'}</b><span>${lo!=null&&lo>0?`ด้วย G/L ${Ra.toFixed(2)}:1 ขาดทุนเฉลี่ยที่เหมาะ ≈ ${(lo*100).toFixed(1)}% (ตอนนี้ ${(L*100).toFixed(1)}%)`:'ระบบยังไม่ทำกำไรด้วยค่าเฉลี่ยนี้'}</span></div>`
+    + `<div><span>ลองในการจำลอง (G/L ${+R.toFixed(2)}:1 ตามตาราง)</span><b>Stop ${sugg}% · ขายครึ่งที่ +${Math.round(sugg*R)}%</b><button type="button" class="btn2" id="rapply" data-l="${sugg}" data-g="${Math.round(sugg*R)}" style="margin-top:6px">ใช้ค่านี้ในการจำลอง</button></div>`;
+}
+function applyStop(l, g){
+  $('#s_stop').value = l; $('#s_tp').value = Math.round(g); store.set('sstop', l); store.set('stp', Math.round(g));
+  $('#s_stop').dispatchEvent(new Event('change')); $('.sim').scrollIntoView({behavior:'smooth'});
+}
+$('#rtab').addEventListener('click',e=>{const r=e.target.closest('tr[data-l]'); if(!r) return; const l=+r.dataset.l, g=+r.dataset.g; if (l<2||l>30){ return; } applyStop(l, Math.min(100, g));});
+$('#rmine').addEventListener('click',e=>{const b=e.target.closest('#rapply'); if(b) applyStop(+b.dataset.l, +b.dataset.g);});
+for (const [id,[k]] of Object.entries(ROIF)) $('#'+id).addEventListener('input',()=>{ store.set(k, $('#'+id).value); renderROI(); });
 
 /* ---------- heat map (squarified treemap) ---------- */
 let CAPS = {}, hmSize = store.get('hmsize','cap');
@@ -1020,7 +1091,7 @@ addEventListener('hashchange',()=>{const s=decodeURIComponent(location.hash.slic
 setInterval(()=>{ if(!document.hidden && ok) load(false); },30000);
 setInterval(()=>{ if(!document.hidden) refreshWatch(); },60000);
 setInterval(()=>{ if(!document.hidden) loadNews(true); },600000);
-loadHeat(); loadBBG(); loadPick(); loadChamp(); runSimUI(); runStrat();
+loadHeat(); loadBBG(); loadPick(); loadChamp(); renderROI(); runSimUI(); runStrat();
 setInterval(()=>{ if(!document.hidden) runSimUI(); },3600000);
 setInterval(()=>{ if(!document.hidden) loadChamp(); },3600000);
 setInterval(()=>{ if(!document.hidden) loadPick(); },3600000);
