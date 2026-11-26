@@ -113,7 +113,7 @@ h1{margin:4px 0 0;font-size:clamp(24px,3.4vw,40px);line-height:1.05;text-wrap:ba
 .sgrid label{display:grid;gap:4px;font-size:13px;color:var(--mute)}
 .sgrid input,.sgrid select{height:44px;border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:0 10px;font-size:16px;color:var(--ink);width:100%}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin:6px 0 14px}
-.kpis div{background:var(--panel);padding:10px 14px}.kpis span{display:block;font-size:13px;color:var(--mute)}.kpis b{font-size:20px;white-space:nowrap;font-variant-numeric:tabular-nums}.kpis small{display:block;font-size:12px;color:var(--mute)}
+.kpis div{background:var(--panel);padding:10px 14px}.kpis span{display:block;font-size:13px;color:var(--mute)}.kpis b{font-size:clamp(16px,2vw,20px);font-variant-numeric:tabular-nums}.kpis small{display:block;font-size:12px;color:var(--mute)}
 #simfig{position:relative;height:320px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
 #simfig svg{position:absolute;inset:0;width:100%;height:100%}
 #simtip{position:absolute;top:8px;left:12px;font-size:13px;background:color-mix(in srgb,var(--panel) 85%,transparent);padding:2px 6px;border-radius:6px;pointer-events:none}
@@ -788,7 +788,7 @@ const pcs = v => v==null ? '–' : (v>=0?'+':'')+(+v).toFixed(2)+'%';
 function drawSim(){
   const box=$('#simfig'), old=box.querySelector('svg'); if (old) old.remove();
   if (!SIM || SIM.pending || !SIM.equity?.length) return;
-  const W=box.clientWidth, H=box.clientHeight, L=56, R=10, T=10, B=26, n=SIM.equity.length;
+  const W=box.clientWidth, H=box.clientHeight, L=56, R=10, T=32, B=26, n=SIM.equity.length;
   const all=[...SIM.equity,...SIM.spy,...SIM.qqq], lo=Math.min(...all)*0.98, hi=Math.max(...all)*1.02;
   const x=i=>L+(n<2?0:i/(n-1))*(W-L-R), y=v=>T+(1-(v-lo)/(hi-lo||1))*(H-T-B);
   const path=a=>a.map((v,i)=>`${i?'L':'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join('');
