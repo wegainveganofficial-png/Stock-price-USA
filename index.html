@@ -120,6 +120,13 @@ h1{margin:4px 0 0;font-size:clamp(24px,3.4vw,40px);line-height:1.05;text-wrap:ba
 .slegend{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--mute);margin:8px 0 14px}.slegend i{display:inline-block;width:14px;height:3px;border-radius:2px;margin-right:6px;vertical-align:middle}
 .stab{width:100%;font-size:14px;min-width:720px}.stab td,.stab th{white-space:nowrap}.stab tbody tr{cursor:pointer}.stab tbody tr:hover td{background:var(--sea)}
 .sim h3{font-size:16px;margin:16px 0 6px}
+.strat{margin-top:20px}
+.strat .hrow{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.xtab{width:100%;font-size:14px;min-width:980px}.xtab td,.xtab th{white-space:nowrap}.xtab th{vertical-align:bottom;white-space:normal;min-width:70px}
+.xtab tr.sub td{background:color-mix(in srgb,var(--sea) 40%,transparent);font-size:13px}.xtab tr.sub td:first-child{padding-left:18px}
+.xtab td small{display:block;color:var(--mute);font-size:12px}
+.btn2{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:10px;height:44px;padding:0 16px;cursor:pointer;font-weight:600}
+.btn2:disabled{opacity:.5;cursor:progress}
 .cctl{display:flex;gap:12px;flex-wrap:wrap;align-items:end;margin:10px 0 12px}
 .cctl label{display:grid;gap:4px;font-size:13px;color:var(--mute)}
 .cctl input[type=number]{height:44px;width:150px;border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:0 10px;font-size:16px;color:var(--ink)}
@@ -282,8 +289,18 @@ footer{max-width:1320px;margin:0 auto;padding:8px max(4vw,16px) 40px;font-size:1
         <p><b>ขนาดไม้:</b> เสี่ยงต่อไม้ตามที่ตั้ง (ค่าเริ่มต้น 1.25% ของพอร์ต) · จุดตัดขาดทุน = ราคาปิดต่ำสุด 10 วัน ไม่ห่างเกิน 8% และไม่ใกล้กว่า 3% · ไม่เกิน 25% ของพอร์ตต่อตัว</p>
         <p><b>ขาย:</b> ตัดขาดทุนเมื่อปิดต่ำกว่าจุดตัดขาดทุน · กำไร 10% ขยับจุดตัดขาดทุนมาที่ทุน · กำไร 20% ขายครึ่งหนึ่งและล็อกกำไร 5% · ส่วนที่เหลือขายเมื่อปิดหลุด SMA50 · ตัดขาดทุนแล้วพักตัวนั้น 10 วัน</p>
         <p><b>ETF ขาลง:</b> ซื้อตามสัดส่วนที่ตั้งเมื่อเข้าเงื่อนไข และขายเมื่อตลาดพ้นเงื่อนไข หรือขาดทุนเกิน 8% (SQQQ 15%) · ETF ชนิดเลเวอเรจ/ผกผันออกแบบมาสำหรับถือระยะสั้น มูลค่าเสื่อมเมื่อถือนานในตลาดผันผวน</p>
+        <p><b>หมายเหตุ:</b> ตารางสรุปตามกลยุทธ์ด้านล่างใช้ช่วงเวลาและค่าตั้งเดียวกับการ์ดนี้</p>
         <p><b>ข้อจำกัด:</b> ซื้อขายที่ราคาปิด (Minervini ซื้อระหว่างวันตอนทะลุ pivot) · หักค่าธรรมเนียม+slippage 0.1% ต่อครั้ง · ไม่รวมปันผล · ใช้รายชื่อ S&amp;P 500 ปัจจุบันย้อนหลัง ทำให้ผลย้อนหลังดีเกินจริง (survivorship bias) · Paper trade นับจริงตั้งแต่ 27 พ.ย. 2026 ด้วยกฎเดียวกันทุกวัน ผลในอดีตไม่รับประกันอนาคต · ไม่ใช่คำแนะนำการลงทุน</p>
       </details>
+    </div>
+    <div class="card strat">
+      <div class="hrow">
+        <div><h2>สรุปผลการเทรดแยกตามกลยุทธ์</h2>
+          <p class="mute small" id="xnote" style="margin:0">ใช้ช่วงเวลาและค่าตั้งจากการ์ดจำลองด้านบน · นับเฉพาะไม้ที่ปิดแล้ว</p></div>
+        <button type="button" class="btn2" id="xdl" disabled>ดาวน์โหลด Excel (.xlsx)</button>
+      </div>
+      <div class="scroll" style="margin-top:10px"><table class="xtab" id="xtab"></table></div>
+      <p class="mute small" style="margin:8px 0 0">ไม้ที่ชนะ = ปิดแล้วมีกำไรหลังหักค่าธรรมเนียม · % คิดจากเงินที่ลงในไม้นั้น · ไม้ที่ขายครึ่งหนึ่งที่ +20% นับเป็น 1 ไม้ เมื่อขายส่วนที่เหลือ · ไฟล์ Excel มีชีตสรุปและชีตบันทึกการเทรดรายไม้ของแต่ละกลยุทธ์</p>
     </div>
     <div class="card news">
       <div class="nhead"><h2>ข่าวล่าสุด <span id="nsym"></span></h2><span class="mute small">แปลเป็นภาษาไทยอัตโนมัติ · ต้นฉบับภาษาอังกฤษจาก Yahoo Finance</span></div>
@@ -846,6 +863,91 @@ async function runSimUI(){
 for (const [id,[k]] of Object.entries(SIMF)) $('#'+id).addEventListener('change',()=>{ store.set(k, $('#'+id).value); clearTimeout(simT); simT=setTimeout(runSimUI,300); });
 for (const id of ['sopen','strades']) $('#'+id).addEventListener('click',e=>{const t=e.target.closest('[data-s]'); if(t){ select(t.dataset.s); scrollTo({top:0,behavior:'smooth'}); }});
 
+/* ---------- strategy comparison + Excel export ---------- */
+const STRATS = [
+  {id:'none', name:'Minervini breakout (ถือเงินสดตอนตลาดลง)'},
+  {id:'SH', name:'Minervini + SH (−1x S&P 500)'},
+  {id:'PSQ', name:'Minervini + PSQ (−1x Nasdaq-100)'},
+  {id:'SQQQ', name:'Minervini + SQQQ (−3x Nasdaq-100)'},
+];
+let XR = null, xSeq = 0;
+function tstats(tr){
+  const w = tr.filter(t=>t.pnl>0), l = tr.filter(t=>t.pnl<=0), av=(a,f)=>a.length?a.reduce((s,x)=>s+x[f],0)/a.length:null;
+  const best = tr.length ? tr.reduce((a,b)=>b.pct>a.pct?b:a) : null, worst = tr.length ? tr.reduce((a,b)=>b.pct<a.pct?b:a) : null;
+  return { n:tr.length, win: tr.length? w.length/tr.length*100 : null, avgWin: av(w,'pct'), avgLoss: av(l,'pct'), avgWinUsd: av(w,'pnl'), avgLossUsd: av(l,'pnl'),
+    best, worst, dWin: av(w,'days'), dLoss: av(l,'days'), pnl: tr.reduce((s,x)=>s+x.pnl,0) };
+}
+const f1 = v => v==null ? '–' : (+v).toFixed(1);
+function renderStrat(){
+  if (!XR) return;
+  if (XR.pending){ $('#xtab').innerHTML = `<tr><td class="mute">Paper trade เริ่มนับ ${esc(XR.paperStart)} ยังไม่มีไม้ที่ปิด · เลือกช่วง “ย้อนหลัง” ในการ์ดจำลองเพื่อดูผลในอดีต</td></tr>`; $('#xdl').disabled = true; return; }
+  const row = (name, r, s, cls='') => `<tr class="${cls}"><td><b>${esc(name)}</b>${r?`<small>ผลตอบแทนพอร์ต ${pcs(r.stats.ret)} · ลงหนักสุด ${pcs(r.stats.maxDD)}</small>`:''}</td>
+    <td class="r">${s.n}</td><td class="r">${s.win==null?'–':s.win.toFixed(1)+'%'}</td>
+    <td class="r upc">${pcs(s.avgWin)}<small>${s.avgWinUsd==null?'':money(s.avgWinUsd)}</small></td>
+    <td class="r dnc">${pcs(s.avgLoss)}<small>${s.avgLossUsd==null?'':'−'+money(Math.abs(s.avgLossUsd))}</small></td>
+    <td class="r upc">${s.best?pcs(s.best.pct):'–'}<small>${s.best?esc(s.best.sym)+' · '+esc(s.best.d1):''}</small></td>
+    <td class="r dnc">${s.worst?pcs(s.worst.pct):'–'}<small>${s.worst?esc(s.worst.sym)+' · '+esc(s.worst.d1):''}</small></td>
+    <td class="r">${f1(s.dWin)}</td><td class="r">${f1(s.dLoss)}</td>
+    <td class="r ${sgn(s.pnl)}">${s.n?(s.pnl>=0?'+':'−')+money(Math.abs(s.pnl)):'–'}</td></tr>`;
+  let body = '';
+  for (const st of STRATS){
+    const r = XR.runs[st.id]; if (!r) continue;
+    body += row(st.name, r, tstats(r.trades));
+    if (st.id!=='none'){
+      body += row('└ เฉพาะไม้หุ้น (breakout)', null, tstats(r.trades.filter(t=>t.kind==='long')), 'sub');
+      body += row(`└ เฉพาะไม้ ${st.id}`, null, tstats(r.trades.filter(t=>t.kind==='short')), 'sub');
+    }
+  }
+  $('#xtab').innerHTML = `<thead><tr><th>กลยุทธ์</th><th class="r">จำนวนครั้งที่เทรด</th><th class="r">% การเทรดที่ชนะ</th><th class="r">กำไรเฉลี่ย</th><th class="r">ขาดทุนเฉลี่ย</th><th class="r">กำไรเยอะสุด</th><th class="r">ขาดทุนเยอะสุด</th><th class="r">วันถือเฉลี่ย ไม้กำไร</th><th class="r">วันถือเฉลี่ย ไม้ขาดทุน</th><th class="r">กำไร/ขาดทุนรวม</th></tr></thead><tbody>${body}</tbody>`;
+  const any = Object.values(XR.runs)[0];
+  $('#xnote').textContent = `ช่วง ${any.dates[0]} ถึง ${any.dates.at(-1)} · เงินเริ่มต้น ${money(any.params.capital)} · เสี่ยง ${any.params.risk}% ต่อไม้ · ถือสูงสุด ${any.params.maxPos} ตัว · ETF ขาลง ${any.params.shortAlloc}% ของพอร์ต (${any.params.strig==='fast'?'QQQ หลุด SMA50':'ขาลงยืนยัน'}) · นับเฉพาะไม้ที่ปิดแล้ว`;
+  $('#xdl').disabled = false;
+}
+async function runStrat(){
+  const seq = ++xSeq, v=id=>encodeURIComponent($('#'+id).value);
+  $('#xdl').disabled = true; $('#xtab').innerHTML = '<tr><td class="mute">กำลังจำลองทั้ง 4 กลยุทธ์…</td></tr>';
+  try{
+    const base = `type=sim&period=${v('s_period')}&capital=${v('s_cap')}&risk=${v('s_risk')}&maxpos=${v('s_max')}&salloc=${v('s_salloc')}&strig=${v('s_strig')}`;
+    const res = await Promise.all(STRATS.map(s=>api(base+'&short='+s.id).then(r=>r.json())));
+    if (seq!==xSeq) return;
+    const bad = res.find(j=>j.error); if (bad) throw new Error(bad.error);
+    XR = res[0].pending ? {pending:true, paperStart:res[0].paperStart} : {runs:Object.fromEntries(STRATS.map((s,i)=>[s.id,res[i]]))};
+    renderStrat();
+  }catch(e){ if (seq===xSeq) $('#xtab').innerHTML = `<tr><td class="dnc">สรุปไม่สำเร็จ: ${esc(e.message)}</td></tr>`; }
+}
+function loadXLSX(){
+  return window.XLSX ? Promise.resolve(window.XLSX) : new Promise((ok,no)=>{ const s=document.createElement('script'); s.src='https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js'; s.onload=()=>ok(window.XLSX); s.onerror=()=>no(new Error('โหลดตัวสร้างไฟล์ Excel ไม่สำเร็จ')); document.head.appendChild(s); });
+}
+function buildWorkbook(X){
+  const wb = X.utils.book_new(), any = Object.values(XR.runs)[0], p = any.params, r2 = v => v==null ? null : Math.round(v*100)/100;
+  const head = ['กลยุทธ์','ผลตอบแทนพอร์ต (%)','ลงหนักสุดของพอร์ต (%)','จำนวนครั้งที่เทรด','% การเทรดที่ชนะ','กำไรเฉลี่ย (%)','กำไรเฉลี่ย (USD)','ขาดทุนเฉลี่ย (%)','ขาดทุนเฉลี่ย (USD)','กำไรเยอะสุด (%)','กำไรเยอะสุด (หุ้น)','ขาดทุนเยอะสุด (%)','ขาดทุนเยอะสุด (หุ้น)','วันถือเฉลี่ย ไม้กำไร','วันถือเฉลี่ย ไม้ขาดทุน','กำไร/ขาดทุนรวม (USD)'];
+  const line = (name, r, s) => [name, r?r.stats.ret:null, r?r.stats.maxDD:null, s.n, r2(s.win), r2(s.avgWin), r2(s.avgWinUsd), r2(s.avgLoss), r2(s.avgLossUsd), s.best?s.best.pct:null, s.best?`${s.best.sym} ${s.best.d0}→${s.best.d1}`:'', s.worst?s.worst.pct:null, s.worst?`${s.worst.sym} ${s.worst.d0}→${s.worst.d1}`:'', r2(s.dWin), r2(s.dLoss), r2(s.pnl)];
+  const rows = [head];
+  for (const st of STRATS){ const r = XR.runs[st.id]; rows.push(line(st.name, r, tstats(r.trades)));
+    if (st.id!=='none'){ rows.push(line('  เฉพาะไม้หุ้น (breakout)', null, tstats(r.trades.filter(t=>t.kind==='long')))); rows.push(line(`  เฉพาะไม้ ${st.id}`, null, tstats(r.trades.filter(t=>t.kind==='short')))); } }
+  rows.push([], ['ถือ SPY เฉยๆ', any.stats.spyRet, any.stats.spyDD], ['ถือ QQQ เฉยๆ', any.stats.qqqRet, any.stats.qqqDD]);
+  const ws = X.utils.aoa_to_sheet(rows); ws['!cols'] = head.map((_,i)=>({wch: i===0?42:(i===10||i===12?26:14)})); ws['!freeze']={xSplit:1,ySplit:1};
+  X.utils.book_append_sheet(wb, ws, 'สรุปตามกลยุทธ์');
+  const th = ['หุ้น/ETF','ประเภท','วันที่ซื้อ','วันที่ขาย','จำนวนวันที่ถือ','ราคาซื้อ (USD)','ราคาขาย (USD)','ผลตอบแทน (%)','กำไร/ขาดทุน (USD)','ผลลัพธ์','เหตุผลที่ขาย','หมายเหตุ'];
+  for (const st of STRATS){
+    const tr = [...XR.runs[st.id].trades].reverse();
+    const ws2 = X.utils.aoa_to_sheet([th, ...tr.map(t=>[t.sym, t.kind==='short'?'ETF ขาลง':'หุ้น breakout', t.d0, t.d1, t.days, t.entry, t.exit, t.pct, t.pnl, t.pnl>0?'กำไร':'ขาดทุน', t.why, t.note||''])]);
+    ws2['!cols'] = th.map((_,i)=>({wch:[10,14,12,12,10,12,12,12,14,8,28,22][i]}));
+    X.utils.book_append_sheet(wb, ws2, ('เทรด ' + (st.id==='none'?'Minervini':'Minervini+'+st.id)).slice(0,31));
+  }
+  const ps = [['รายการ','ค่า'],['ช่วงเวลา', `${any.dates[0]} ถึง ${any.dates.at(-1)}`],['เงินเริ่มต้น (USD)', p.capital],['ความเสี่ยงต่อไม้ (%)', p.risk],['ถือหุ้นพร้อมกันสูงสุด', p.maxPos],['สัดส่วน ETF ขาลง (%)', p.shortAlloc],['เงื่อนไขเข้า ETF ขาลง', p.strig==='fast'?'QQQ หลุด SMA50':'ขาลงยืนยัน SMA50 < SMA200'],['ค่าธรรมเนียม+slippage ต่อครั้ง (%)', 0.1],['จำนวนหุ้นในจักรวาล', any.universe],['แหล่งข้อมูล','ราคาปิดรายวันจาก Yahoo Finance · รายชื่อ S&P 500 จาก Wikipedia'],['สร้างไฟล์เมื่อ', new Date().toLocaleString('th-TH',{timeZone:'Asia/Bangkok'})],['ข้อควรรู้','ผลจำลอง ซื้อขายที่ราคาปิด ไม่รวมปันผล ใช้รายชื่อ S&P 500 ปัจจุบันย้อนหลัง (survivorship bias) · ไม่ใช่คำแนะนำการลงทุน']];
+  const ws3 = X.utils.aoa_to_sheet(ps); ws3['!cols']=[{wch:32},{wch:70}];
+  X.utils.book_append_sheet(wb, ws3, 'ค่าตั้งและแหล่งข้อมูล');
+  return { wb, file: `minervini-trades_${any.dates[0]}_${any.dates.at(-1)}.xlsx` };
+}
+$('#xdl').addEventListener('click', async ()=>{
+  const b=$('#xdl'); b.disabled=true; const t=b.textContent; b.textContent='กำลังสร้างไฟล์…';
+  try{ const X = await loadXLSX(); const {wb,file} = buildWorkbook(X); X.writeFile(wb, file); }
+  catch(e){ $('#xnote').innerHTML = `<span class="dnc">${esc(e.message)}</span>`; }
+  finally{ b.textContent=t; b.disabled=false; }
+});
+for (const id of Object.keys(SIMF)) $('#'+id).addEventListener('change',()=>{ clearTimeout(window.__xT); window.__xT=setTimeout(runStrat,600); });
+
 /* ---------- heat map (squarified treemap) ---------- */
 let CAPS = {}, hmSize = store.get('hmsize','cap');
 function squarify(items, x, y, w, h){
@@ -918,7 +1020,7 @@ addEventListener('hashchange',()=>{const s=decodeURIComponent(location.hash.slic
 setInterval(()=>{ if(!document.hidden && ok) load(false); },30000);
 setInterval(()=>{ if(!document.hidden) refreshWatch(); },60000);
 setInterval(()=>{ if(!document.hidden) loadNews(true); },600000);
-loadHeat(); loadBBG(); loadPick(); loadChamp(); runSimUI();
+loadHeat(); loadBBG(); loadPick(); loadChamp(); runSimUI(); runStrat();
 setInterval(()=>{ if(!document.hidden) runSimUI(); },3600000);
 setInterval(()=>{ if(!document.hidden) loadChamp(); },3600000);
 setInterval(()=>{ if(!document.hidden) loadPick(); },3600000);
