@@ -1049,12 +1049,13 @@ for (const [id,[k]] of Object.entries(ROIF)) $('#'+id).addEventListener('input',
 /* ---------- stock of the year: 10 shots a year, one stock at a time ---------- */
 $('#y_alloc').value = String(store.get('yalloc', 50));
 const STAT_TH = {breakout:'ทะลุจุดซื้อ', near:'ใกล้จุดซื้อ', base:'กำลังสร้างฐาน', extended:'วิ่งเกินจุดซื้อ'};
-async function loadYear(){
+async function loadYear(retry=1){
   const v=id=>encodeURIComponent($('#'+id).value), al=v('y_alloc');
   const base = `type=sim&mode=elite&short=none&alloc=${al}&capital=${v('s_cap')}&stop=${v('s_stop')}&tp=${v('s_tp')}`;
   try{
     const [now, bt] = await Promise.all([api(base+'&period=paper').then(r=>r.json()), api(base+'&period=1y').then(r=>r.json())]);
     if (now.error || bt.error) throw new Error(now.error || bt.error);
+    if ((!now.elite || !bt.elite) && retry) { setTimeout(()=>loadYear(0), 2000); return; }
     const live = now.pending ? null : now;   // paper trade state once it has started
     const E = (live || now).elite, s = E.signal, tp = +$('#s_tp').value;
     const used = live ? E.used : 0, yr = E.year;
