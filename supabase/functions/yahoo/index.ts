@@ -1,4 +1,4 @@
-// Proxy to Yahoo Finance (chart, symbol search, news, batch quotes) + S&P 500 list (Wikipedia) + market caps + Bloomberg RSS headlines + stock-of-the-day screen + Minervini champion screen + daily trading simulator for the US Stock Tracker page.
+// Proxy to Yahoo Finance (chart, symbol search, news, batch quotes) + S&P 500 list (Wikipedia) + market caps + Bloomberg RSS headlines + stock-of-the-day screen + Minervini champion screen + daily trading simulator (incl. 10-shots-a-year elite mode) for the US Stock Tracker page.
 // Thai translation of news is done in the browser (translation services block server IPs).
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36';
 const RANGES = new Set(['1d','5d','1mo','3mo','6mo','1y','2y','5y','max']);
@@ -308,7 +308,17 @@ async function simUniverse() {
   simData = { t: Date.now(), d };
   return d;
 }
-type SimOpts = { start: number; capital: number; risk: number; maxPos: number; short: string; shortAlloc: number; strig: string; stop: number; tp: number; cost: number };
+type SimOpts = { start: number; capital: number; risk: number; maxPos: number; short: string; shortAlloc: number; strig: string; stop: number; tp: number; mode: string; alloc: number; cost: number };
+// Elite ("stock of the year") setup: Trend Template + RS >= 90, tight base that is narrowing, near the 52-week high
+function eliteSetup(a: Float64Array, I: Ind, t: number, rk: number) {
+  const p = a[t];
+  if (!(p > I.s150[t] && p > I.s200[t] && I.s150[t] > I.s200[t] && I.s200[t] > I.s200[t - 22] && I.s50[t] > I.s150[t] && I.s50[t] > I.s200[t] && p > I.s50[t] && p >= I.lo[t] * 1.3 && p >= I.hi[t] * 0.85 && rk >= 90)) return null;
+  let piv = -Infinity, mn = Infinity; for (let i = t - 15; i < t; i++) { if (a[i] > piv) piv = a[i]; if (a[i] < mn) mn = a[i]; }
+  let mx2 = -Infinity, mn2 = Infinity; for (let i = t - 30; i < t - 15; i++) { if (a[i] > mx2) mx2 = a[i]; if (a[i] < mn2) mn2 = a[i]; }
+  const base = piv / mn - 1, prior = mx2 / mn2 - 1;
+  if (base > 0.12 || base > prior) return null;
+  return { piv, base, score: rk + (0.12 - base) * 100 };
+}
 function runSim(d: any, o: SimOpts) {
   const { dates, syms, P, first, ind, etf } = d; const T = dates.length;
   const at = new Map<string, number>(syms.map((s: string, i: number) => [s, i]));
@@ -317,6 +327,7 @@ function runSim(d: any, o: SimOpts) {
   let cash = o.capital;
   type Pos = { k: number; kind: 'long' | 'short'; sh: number; init: number; entry: number; t0: number; stop: number; half: boolean; cost: number; got: number; note: string };
   const pos = new Map<number, Pos>(); const trades: any[] = []; const cool = new Map<number, number>();
+  const elite = o.mode === 'elite'; const used: Record<string, number> = {}; const shots: any[] = [];
   const eq: number[] = [], bs: number[] = [], bq: number[] = [], reg: string[] = [], expo: number[] = [];
   const equityAt = (t: number) => { let v = cash; for (const p of pos.values()) v += p.sh * P[p.k][t]; return v; };
   const sell = (p: Pos, t: number, sh: number, why: string) => {
@@ -355,7 +366,23 @@ function runSim(d: any, o: SimOpts) {
     }
     // new long breakouts in a confirmed uptrend
     let longs = [...pos.values()].filter((p) => p.kind === 'long').length;
-    if (r === 'U' && longs < o.maxPos) {
+    const yr = dates[t].slice(0, 4);
+    if (elite && r === 'U' && longs === 0 && (used[yr] || 0) < 10) {
+      let best: { k: number; score: number; rk: number } | null = null;
+      for (const k of stocks) {
+        if ((cool.get(k) ?? -1) > t || t - first[k] < 253 || t < 31) continue;
+        const a = P[k], rk = rank.get(k) ?? 0, st = eliteSetup(a, ind[k], t, rk);
+        if (!st || !(a[t] > st.piv && a[t] <= st.piv * 1.05)) continue;
+        if (!best || st.score > best.score) best = { k, score: st.score, rk };
+      }
+      if (best) {
+        const a = P[best.k], px = a[t]; let m10 = Infinity; for (let i = t - 10; i < t; i++) m10 = Math.min(m10, a[i]);
+        const stop = Math.min(Math.max(m10, px * (1 - o.stop)), px * (1 - Math.min(0.03, o.stop))), e = equityAt(t);
+        const sh = Math.floor(Math.min(e * o.alloc / px, cash / (px * (1 + o.cost))));
+        if (sh >= 1) { buy(best.k, t, sh, 'long', stop); used[yr] = (used[yr] || 0) + 1; shots.push({ n: used[yr], year: yr, d: dates[t], sym: syms[best.k], rs: best.rk, entry: +px.toFixed(2), stop: +stop.toFixed(2) }); longs++; }
+      }
+    }
+    if (!elite && r === 'U' && longs < o.maxPos) {
       const cands: [number, number][] = [];
       for (const k of stocks) {
         if (pos.has(k) || (cool.get(k) ?? -1) > t || t - first[k] < 253 || t < 16) continue;
@@ -394,7 +421,30 @@ function runSim(d: any, o: SimOpts) {
     },
     open: [...pos.values()].map((p) => ({ sym: syms[p.k], kind: p.kind, d0: dates[p.t0], entry: +p.entry.toFixed(2), price: +P[p.k][last].toFixed(2), sh: p.sh, value: +(p.sh * P[p.k][last]).toFixed(2), pct: +((P[p.k][last] / p.entry - 1) * 100).toFixed(2), stop: +p.stop.toFixed(2), note: p.note })),
     trades: trades.reverse(),
+    elite: elite ? eliteToday(d, o, used, shots, pos, r0(T - 1)) : undefined,
   };
+  function r0(t: number) { const qp = P[q][t], q50 = ind[q].s50[t], q200 = ind[q].s200[t]; return qp > q50 && q50 > q200 ? 'U' : qp < q50 && q50 < q200 ? 'D' : 'N'; }
+}
+// Today's view for the elite strategy: signal, holdings, shots used, and names close to a buy point
+function eliteToday(d: any, o: SimOpts, used: Record<string, number>, shots: any[], pos: Map<number, any>, regime: string) {
+  const { dates, syms, P, first, ind, etf } = d; const t = dates.length - 1; const yr = dates[t].slice(0, 4);
+  const stocks = syms.map((_: string, k: number) => k).filter((k: number) => !etf.has(syms[k]));
+  const vals: [number, number][] = []; for (const k of stocks) { const v = ind[k].rsv[t]; if (!isNaN(v)) vals.push([v, k]); }
+  vals.sort((a, b) => a[0] - b[0]); const rank = new Map<number, number>(); vals.forEach(([, k], i) => rank.set(k, Math.max(1, Math.round(((i + 1) / vals.length) * 99))));
+  const watch: any[] = [];
+  for (const k of stocks) {
+    if (t - first[k] < 253) continue;
+    const a = P[k], rk = rank.get(k) ?? 0, st = eliteSetup(a, ind[k], t, rk); if (!st) continue;
+    const p = a[t]; let m10 = Infinity; for (let i = t - 10; i < t; i++) m10 = Math.min(m10, a[i]);
+    const status = p > st.piv * 1.05 ? 'extended' : p > st.piv ? 'breakout' : p >= st.piv * 0.95 ? 'near' : 'base';
+    watch.push({ sym: syms[k], name: d.names[syms[k]] || '', rs: rk, price: +p.toFixed(2), pivot: +st.piv.toFixed(2), toPivot: +((st.piv / p - 1) * 100).toFixed(2), base: +(st.base * 100).toFixed(1), stop: +Math.min(Math.max(m10, st.piv * (1 - o.stop)), st.piv * (1 - Math.min(0.03, o.stop))).toFixed(2), score: +st.score.toFixed(1), status });
+  }
+  watch.sort((a, b) => b.score - a.score);
+  const holding = [...pos.values()].filter((p: any) => p.kind === 'long').map((p: any) => syms[p.k]);
+  const left = 10 - (used[yr] || 0);
+  const top = watch.find((w) => w.status === 'breakout');
+  const signal = holding.length ? { type: 'hold', sym: holding[0] } : regime !== 'U' ? { type: 'wait-market' } : left <= 0 ? { type: 'no-shots' } : top ? { type: 'buy', ...top } : { type: 'none' };
+  return { year: yr, used: used[yr] || 0, usedByYear: used, left, regime, signal, shots, watch: watch.slice(0, 8), asOfDate: dates[t] };
 }
 const simCache = new Map<string, { t: number; v: unknown }>();
 async function simulate(u: URL) {
@@ -406,17 +456,22 @@ async function simulate(u: URL) {
     risk: Math.min(0.05, Math.max(0.0025, +(u.searchParams.get('risk') || 1.25) / 100)),
     maxPos: Math.min(12, Math.max(1, Math.round(+(u.searchParams.get('maxpos') || 6)))),
     short: SHORT_ETF[short] ? short : 'none', shortAlloc: Math.min(1, Math.max(0, +(u.searchParams.get('salloc') || 30) / 100)), strig: u.searchParams.get('strig') === 'confirmed' ? 'confirmed' : 'fast',
-    stop: Math.min(0.3, Math.max(0.02, +(u.searchParams.get('stop') || 8) / 100)), tp: Math.min(1, Math.max(0.04, +(u.searchParams.get('tp') || 20) / 100)), cost: 0.001,
+    stop: Math.min(0.3, Math.max(0.02, +(u.searchParams.get('stop') || 8) / 100)), tp: Math.min(1, Math.max(0.04, +(u.searchParams.get('tp') || 20) / 100)),
+    mode: u.searchParams.get('mode') === 'elite' ? 'elite' : 'normal', alloc: Math.min(1, Math.max(0.1, +(u.searchParams.get('alloc') || 50) / 100)), cost: 0.001,
   };
   const T = d.dates.length, PAPER = '2026-11-27';
   if (period === 'paper') {
     const i = d.dates.findIndex((x: string) => x >= PAPER);
-    if (i < 0) return { pending: true, paperStart: PAPER, lastDate: d.dates[T - 1], universe: d.universe };
+    if (i < 0) {
+      const q = d.syms.indexOf('QQQ'), qp = d.P[q][T - 1], q50 = d.ind[q].s50[T - 1], q200 = d.ind[q].s200[T - 1];
+      const reg = qp > q50 && q50 > q200 ? 'U' : qp < q50 && q50 < q200 ? 'D' : 'N';
+      return { pending: true, paperStart: PAPER, lastDate: d.dates[T - 1], universe: d.universe, elite: o.mode === 'elite' ? eliteToday(d, o, {}, [], new Map(), reg) : undefined };
+    }
     o.start = i;
   } else o.start = Math.max(253, T - (({ '3m': 63, '6m': 126, '1y': 252 } as Record<string, number>)[period] ?? 252));
   const key = JSON.stringify(o) + d.asOf;
   const c = simCache.get(key); if (c) return c.v;
-  const v = { ...runSim(d, o), params: { ...o, period, risk: o.risk * 100, shortAlloc: o.shortAlloc * 100, stop: o.stop * 100, tp: o.tp * 100 }, universe: d.universe, asOf: d.asOf, paperStart: PAPER };
+  const v = { ...runSim(d, o), params: { ...o, period, risk: o.risk * 100, shortAlloc: o.shortAlloc * 100, stop: o.stop * 100, tp: o.tp * 100, alloc: o.alloc * 100 }, universe: d.universe, asOf: d.asOf, paperStart: PAPER };
   if (simCache.size > 50) simCache.clear(); simCache.set(key, { t: Date.now(), v });
   return v;
 }

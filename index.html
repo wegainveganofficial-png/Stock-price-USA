@@ -128,6 +128,14 @@ h1{margin:4px 0 0;font-size:clamp(24px,3.4vw,40px);line-height:1.05;text-wrap:ba
 .btn2{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:10px;height:44px;padding:0 16px;cursor:pointer;font-weight:600}
 .btn2:disabled{opacity:.5;cursor:progress}
 .roi{margin-top:20px}
+.yr{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin-bottom:22px}
+.yr .top{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start}
+.shots{display:flex;gap:4px;margin:8px 0 2px}.shots i{width:18px;height:18px;border-radius:4px;background:var(--line);display:block}
+.shots i.w{background:var(--up)}.shots i.l{background:var(--down)}.shots i.o{background:var(--acc)}
+.sig{border-radius:12px;padding:12px 14px;margin:12px 0;background:var(--sea)}
+.sig b{font-size:20px}.sig.buy{background:color-mix(in srgb,var(--up) 18%,transparent)}.sig.wait{background:color-mix(in srgb,var(--mute) 15%,transparent)}
+.stag{font-size:12px;padding:1px 8px;border-radius:99px;white-space:nowrap}
+.stag.breakout{background:var(--up);color:#fff}.stag.near{background:var(--acc);color:#fff}.stag.base{background:var(--line)}.stag.extended{background:var(--sr);color:#fff}
 .rtab{width:100%;font-size:15px;min-width:640px;font-variant-numeric:tabular-nums}
 .rtab th{background:var(--ink);color:var(--bg);font-weight:600;text-align:right;padding:8px 10px;white-space:normal;vertical-align:bottom}
 .rtab th:first-child,.rtab td:first-child{text-align:right}
@@ -200,6 +208,20 @@ footer{max-width:1320px;margin:0 auto;padding:8px max(4vw,16px) 40px;font-size:1
 
 <main class="wrap">
   <section>
+    <div class="yr" id="yrcard">
+      <div class="top">
+        <div><p class="kick" style="margin:0;font-size:13px;color:var(--acc);font-weight:600">หุ้นเด่นประจำปี · ซื้อได้ไม่เกิน 10 นัดต่อปี · ถือทีละ 1 ตัว</p>
+          <h2 style="margin:4px 0 0">เลือกเฉพาะจังหวะที่ดีที่สุด</h2>
+          <p class="mute small" style="margin:2px 0 0">Trend Template ครบ + RS ≥ 90 + ห่างจุดสูงสุด 52 สัปดาห์ไม่เกิน 15% + ฐาน 15 วันแกว่งไม่เกิน 12% และแคบกว่าช่วงก่อนหน้า + ปิดทะลุ pivot ไม่เกิน 5% + ตลาด (QQQ) เป็นขาขึ้น · ถ้าเข้าเงื่อนไขหลายตัว เลือกตัวที่ RS สูงและฐานแคบที่สุด</p></div>
+        <label class="small mute" style="display:grid;gap:4px">ลงเงินต่อนัด (% ของพอร์ต)<select id="y_alloc" style="height:44px;border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:0 10px;font-size:16px;color:var(--ink)"><option value="25">25%</option><option value="50">50%</option><option value="100">100% (ทั้งพอร์ต)</option></select></label>
+      </div>
+      <div id="ysig" class="sig wait"><span class="mute">กำลังคัดหุ้น…</span></div>
+      <div class="scroll"><table class="stab" id="ywatch"></table></div>
+      <h3 style="font-size:16px;margin:16px 0 4px">ผลย้อนหลัง 1 ปีของกลยุทธ์นี้</h3>
+      <div class="kpis" id="ykpi"></div>
+      <div id="yshots"></div>
+      <p class="mute small" style="margin:8px 0 0">ใช้ Stop loss และจุดขายครึ่งหนึ่งตามการ์ดจำลองด้านล่าง · นัดที่ใช้นับตามปีปฏิทิน · สัญญาณคำนวณจากราคาปิดล่าสุด ผลย้อนหลังใช้รายชื่อ S&amp;P 500 ปัจจุบัน (survivorship bias) · เป็นสัญญาณทางเทคนิค ไม่ใช่คำแนะนำการลงทุน</p>
+    </div>
     <div class="sotd" id="sotd"><p class="mute" style="margin:0">กำลังคัดหุ้นเด่นประจำวันจาก S&amp;P 500…</p></div>
     <div class="head">
       <div>
@@ -903,7 +925,9 @@ const STRATS = [
   {id:'SH', name:'Minervini + SH (−1x S&P 500)'},
   {id:'PSQ', name:'Minervini + PSQ (−1x Nasdaq-100)'},
   {id:'SQQQ', name:'Minervini + SQQQ (−3x Nasdaq-100)'},
+  {id:'elite', name:'หุ้นเด่นประจำปี (1 ตัว · 10 นัด/ปี)'},
 ];
+const SHORT_IDS = ['SH','PSQ','SQQQ'];
 let XR = null, xSeq = 0;
 function tstats(tr){
   const w = tr.filter(t=>t.pnl>0), l = tr.filter(t=>t.pnl<=0), av=(a,f)=>a.length?a.reduce((s,x)=>s+x[f],0)/a.length:null;
@@ -926,8 +950,8 @@ function renderStrat(){
   let body = '';
   for (const st of STRATS){
     const r = XR.runs[st.id]; if (!r) continue;
-    body += row(st.name, r, tstats(r.trades));
-    if (st.id!=='none'){
+    body += row(st.id==='elite' ? `${st.name} · ลงนัดละ ${r.params.alloc}%` : st.name, r, tstats(r.trades));
+    if (SHORT_IDS.includes(st.id)){
       body += row('└ เฉพาะไม้หุ้น (breakout)', null, tstats(r.trades.filter(t=>t.kind==='long')), 'sub');
       body += row(`└ เฉพาะไม้ ${st.id}`, null, tstats(r.trades.filter(t=>t.kind==='short')), 'sub');
     }
@@ -942,7 +966,7 @@ async function runStrat(){
   $('#xdl').disabled = true; $('#xtab').innerHTML = '<tr><td class="mute">กำลังจำลองทั้ง 4 กลยุทธ์…</td></tr>';
   try{
     const base = `type=sim&period=${v('s_period')}&capital=${v('s_cap')}&risk=${v('s_risk')}&maxpos=${v('s_max')}&salloc=${v('s_salloc')}&strig=${v('s_strig')}&stop=${v('s_stop')}&tp=${v('s_tp')}`;
-    const res = await Promise.all(STRATS.map(s=>api(base+'&short='+s.id).then(r=>r.json())));
+    const res = await Promise.all(STRATS.map(s=>api(base+(s.id==='elite'?`&short=none&mode=elite&alloc=${encodeURIComponent($('#y_alloc').value)}`:'&short='+s.id)).then(r=>r.json())));
     if (seq!==xSeq) return;
     const bad = res.find(j=>j.error); if (bad) throw new Error(bad.error);
     XR = res[0].pending ? {pending:true, paperStart:res[0].paperStart} : {runs:Object.fromEntries(STRATS.map((s,i)=>[s.id,res[i]]))};
@@ -958,7 +982,7 @@ function buildWorkbook(X){
   const line = (name, r, s) => [name, r?r.stats.ret:null, r?r.stats.maxDD:null, s.n, r2(s.win), r2(s.avgWin), r2(s.avgWinUsd), r2(s.avgLoss), r2(s.avgLossUsd), s.best?s.best.pct:null, s.best?`${s.best.sym} ${s.best.d0}→${s.best.d1}`:'', s.worst?s.worst.pct:null, s.worst?`${s.worst.sym} ${s.worst.d0}→${s.worst.d1}`:'', r2(s.dWin), r2(s.dLoss), r2(s.pnl)];
   const rows = [head];
   for (const st of STRATS){ const r = XR.runs[st.id]; rows.push(line(st.name, r, tstats(r.trades)));
-    if (st.id!=='none'){ rows.push(line('  เฉพาะไม้หุ้น (breakout)', null, tstats(r.trades.filter(t=>t.kind==='long')))); rows.push(line(`  เฉพาะไม้ ${st.id}`, null, tstats(r.trades.filter(t=>t.kind==='short')))); } }
+    if (SHORT_IDS.includes(st.id)){ rows.push(line('  เฉพาะไม้หุ้น (breakout)', null, tstats(r.trades.filter(t=>t.kind==='long')))); rows.push(line(`  เฉพาะไม้ ${st.id}`, null, tstats(r.trades.filter(t=>t.kind==='short')))); } }
   rows.push([], ['ถือ SPY เฉยๆ', any.stats.spyRet, any.stats.spyDD], ['ถือ QQQ เฉยๆ', any.stats.qqqRet, any.stats.qqqDD]);
   const ws = X.utils.aoa_to_sheet(rows); ws['!cols'] = head.map((_,i)=>({wch: i===0?42:(i===10||i===12?26:14)})); ws['!freeze']={xSplit:1,ySplit:1};
   X.utils.book_append_sheet(wb, ws, 'สรุปตามกลยุทธ์');
@@ -967,7 +991,7 @@ function buildWorkbook(X){
     const tr = [...XR.runs[st.id].trades].reverse();
     const ws2 = X.utils.aoa_to_sheet([th, ...tr.map(t=>[t.sym, t.kind==='short'?'ETF ขาลง':'หุ้น breakout', t.d0, t.d1, t.days, t.entry, t.exit, t.pct, t.pnl, t.pnl>0?'กำไร':'ขาดทุน', t.why, t.note||''])]);
     ws2['!cols'] = th.map((_,i)=>({wch:[10,14,12,12,10,12,12,12,14,8,28,22][i]}));
-    X.utils.book_append_sheet(wb, ws2, ('เทรด ' + (st.id==='none'?'Minervini':'Minervini+'+st.id)).slice(0,31));
+    X.utils.book_append_sheet(wb, ws2, ('เทรด ' + (st.id==='none'?'Minervini':st.id==='elite'?'หุ้นเด่นประจำปี':'Minervini+'+st.id)).slice(0,31));
   }
   const ps = [['รายการ','ค่า'],['ช่วงเวลา', `${any.dates[0]} ถึง ${any.dates.at(-1)}`],['เงินเริ่มต้น (USD)', p.capital],['ความเสี่ยงต่อไม้ (%)', p.risk],['ถือหุ้นพร้อมกันสูงสุด', p.maxPos],['Stop loss สูงสุด (%)', p.stop],['ขายครึ่งหนึ่งเมื่อกำไร (%)', p.tp],['สัดส่วน ETF ขาลง (%)', p.shortAlloc],['เงื่อนไขเข้า ETF ขาลง', p.strig==='fast'?'QQQ หลุด SMA50':'ขาลงยืนยัน SMA50 < SMA200'],['ค่าธรรมเนียม+slippage ต่อครั้ง (%)', 0.1],['จำนวนหุ้นในจักรวาล', any.universe],['แหล่งข้อมูล','ราคาปิดรายวันจาก Yahoo Finance · รายชื่อ S&P 500 จาก Wikipedia'],['สร้างไฟล์เมื่อ', new Date().toLocaleString('th-TH',{timeZone:'Asia/Bangkok'})],['ข้อควรรู้','ผลจำลอง ซื้อขายที่ราคาปิด ไม่รวมปันผล ใช้รายชื่อ S&P 500 ปัจจุบันย้อนหลัง (survivorship bias) · ไม่ใช่คำแนะนำการลงทุน']];
   const ws3 = X.utils.aoa_to_sheet(ps); ws3['!cols']=[{wch:32},{wch:70}];
@@ -1021,6 +1045,41 @@ function applyStop(l, g){
 $('#rtab').addEventListener('click',e=>{const r=e.target.closest('tr[data-l]'); if(!r) return; const l=+r.dataset.l, g=+r.dataset.g; if (l<2||l>30){ return; } applyStop(l, Math.min(100, g));});
 $('#rmine').addEventListener('click',e=>{const b=e.target.closest('#rapply'); if(b) applyStop(+b.dataset.l, +b.dataset.g);});
 for (const [id,[k]] of Object.entries(ROIF)) $('#'+id).addEventListener('input',()=>{ store.set(k, $('#'+id).value); renderROI(); });
+
+/* ---------- stock of the year: 10 shots a year, one stock at a time ---------- */
+$('#y_alloc').value = String(store.get('yalloc', 50));
+const STAT_TH = {breakout:'ทะลุจุดซื้อ', near:'ใกล้จุดซื้อ', base:'กำลังสร้างฐาน', extended:'วิ่งเกินจุดซื้อ'};
+async function loadYear(){
+  const v=id=>encodeURIComponent($('#'+id).value), al=v('y_alloc');
+  const base = `type=sim&mode=elite&short=none&alloc=${al}&capital=${v('s_cap')}&stop=${v('s_stop')}&tp=${v('s_tp')}`;
+  try{
+    const [now, bt] = await Promise.all([api(base+'&period=paper').then(r=>r.json()), api(base+'&period=1y').then(r=>r.json())]);
+    if (now.error || bt.error) throw new Error(now.error || bt.error);
+    const live = now.pending ? null : now;   // paper trade state once it has started
+    const E = (live || now).elite, s = E.signal, tp = +$('#s_tp').value;
+    const used = live ? E.used : 0, yr = E.year;
+    const sh = Array.from({length:10},(_,i)=>`<i class="${i<used?'o':''}"></i>`).join('');
+    let sig;
+    if (s.type==='buy') sig = `<div class="sig buy"><span class="small">สัญญาณซื้อ · ราคาปิด ${esc(E.asOfDate)}</span><br><b>${esc(s.sym)}</b> ${esc(s.name)} · RS ${s.rs}<br>ราคา ${fp(s.price)} ทะลุ pivot ${fp(s.pivot)} · Stop ${fp(s.stop)} (−${((1-s.stop/s.price)*100).toFixed(1)}%) · ขายครึ่งที่ ${fp(s.price*(1+tp/100))} (+${tp}%) · ใช้นัดที่ ${used+1}/10 ของปี ${esc(yr)}</div>`;
+    else if (s.type==='hold') sig = `<div class="sig"><span class="small">กำลังถือ</span><br><b>${esc(s.sym)}</b> · ยังไม่เปิดนัดใหม่จนกว่าจะขายตัวนี้</div>`;
+    else if (s.type==='wait-market') sig = `<div class="sig wait"><span class="small">ราคาปิด ${esc(E.asOfDate)}</span><br><b>รอ: ตลาดยังไม่เป็นขาขึ้น</b><br>QQQ ยังไม่อยู่เหนือ SMA50 และ SMA50 เหนือ SMA200 · เก็บนัดไว้ใช้ตอนตลาดกลับเป็นขาขึ้น · ตัวที่จะเข้าคิวอยู่ในตารางด้านล่าง</div>`;
+    else if (s.type==='no-shots') sig = `<div class="sig wait"><b>ใช้ครบ 10 นัดของปี ${esc(yr)} แล้ว</b><br>รอปีถัดไป</div>`;
+    else sig = `<div class="sig wait"><span class="small">ราคาปิด ${esc(E.asOfDate)}</span><br><b>ยังไม่มีหุ้นทะลุจุดซื้อ</b><br>ตัวที่ใกล้จุดซื้อที่สุดอยู่ในตารางด้านล่าง</div>`;
+    $('#ysig').outerHTML = `<div id="ysig">${sig}<div class="small mute">ปี ${esc(yr)} ${live?'(paper trade)':'(paper trade เริ่ม '+esc(now.paperStart)+')'} ใช้ไป ${used}/10 นัด</div><div class="shots">${sh}</div></div>`;
+    $('#ywatch').innerHTML = `<thead><tr><th>หุ้นที่เข้าเกณฑ์</th><th>สถานะ</th><th class="r">RS</th><th class="r">ราคา</th><th class="r">Pivot</th><th class="r">ห่าง pivot</th><th class="r">ฐานแกว่ง</th><th class="r">Stop</th></tr></thead><tbody>`
+      + (E.watch.length ? E.watch.map(w=>`<tr data-s="${esc(w.sym)}"><td><b>${esc(w.sym)}</b> <span class="mute small">${esc((w.name||'').slice(0,24))}</span></td><td><span class="stag ${w.status}">${STAT_TH[w.status]}</span></td><td class="r">${w.rs}</td><td class="r">${fp(w.price)}</td><td class="r">${fp(w.pivot)}</td><td class="r">${w.toPivot>0?'+':''}${w.toPivot}%</td><td class="r">${w.base}%</td><td class="r">${fp(w.stop)}</td></tr>`).join('')
+        : '<tr><td colspan="8" class="mute">ไม่มีหุ้นเข้าเกณฑ์เข้มในตอนนี้</td></tr>') + '</tbody>';
+    const st = bt.stats, k=(lab,val,sub,cls='')=>`<div><span>${lab}</span><b class="${cls}">${val}</b>${sub?`<small>${sub}</small>`:''}</div>`;
+    $('#ykpi').innerHTML = k('กลยุทธ์นี้', pcs(st.ret), `ลงหนักสุด ${pcs(st.maxDD)}`, sgn(st.ret)) + k('ถือ SPY', pcs(st.spyRet), '', sgn(st.spyRet)) + k('ถือ QQQ', pcs(st.qqqRet), '', sgn(st.qqqRet))
+      + k('นัดที่ใช้', bt.elite.shots.length, Object.entries(bt.elite.usedByYear).map(([y,n])=>`${y}: ${n}/10`).join(' · ')) + k('ชนะ', st.winRate==null?'–':st.winRate+'%', `กำไร ${pcs(st.avgWin)} / ขาดทุน ${pcs(st.avgLoss)}`);
+    const res = s0 => bt.trades.find(t=>t.sym===s0.sym && t.d0===s0.d) || bt.open.find(o=>o.sym===s0.sym && o.d0===s0.d);
+    $('#yshots').innerHTML = `<div class="scroll"><table class="stab"><thead><tr><th>นัด</th><th>วันที่ซื้อ</th><th>หุ้น</th><th class="r">RS</th><th class="r">ราคาซื้อ</th><th>ผล</th></tr></thead><tbody>${bt.elite.shots.map(s0=>{ const r=res(s0); const pct=r?(r.d1?r.pct:r.pct):null;
+      return `<tr data-s="${esc(s0.sym)}"><td>${s0.year} #${s0.n}</td><td>${esc(s0.d)}</td><td><b>${esc(s0.sym)}</b></td><td class="r">${s0.rs}</td><td class="r">${fp(s0.entry)}</td><td class="${pct==null?'':sgn(pct)}">${r?(r.d1?`${pcs(r.pct)} · ขาย ${esc(r.d1)} · ${esc(r.why)}`:`ถืออยู่ ${pcs(r.pct)}`):'–'}</td></tr>`; }).join('')}</tbody></table></div>`;
+  }catch(e){ $('#ysig').outerHTML = `<div id="ysig" class="sig wait"><span class="dnc">โหลดไม่สำเร็จ: ${esc(e.message)}</span></div>`; }
+}
+$('#y_alloc').addEventListener('change',()=>{ store.set('yalloc', +$('#y_alloc').value); loadYear(); runStrat(); });
+for (const id of ['s_stop','s_tp','s_cap']) $('#'+id).addEventListener('change',()=>{ clearTimeout(window.__yT); window.__yT=setTimeout(loadYear,700); });
+for (const id of ['ywatch','yshots']) $('#'+id).addEventListener('click',e=>{const t=e.target.closest('[data-s]'); if(t){ select(t.dataset.s); scrollTo({top:0,behavior:'smooth'}); }});
 
 /* ---------- heat map (squarified treemap) ---------- */
 let CAPS = {}, hmSize = store.get('hmsize','cap');
@@ -1094,7 +1153,8 @@ addEventListener('hashchange',()=>{const s=decodeURIComponent(location.hash.slic
 setInterval(()=>{ if(!document.hidden && ok) load(false); },30000);
 setInterval(()=>{ if(!document.hidden) refreshWatch(); },60000);
 setInterval(()=>{ if(!document.hidden) loadNews(true); },600000);
-loadHeat(); loadBBG(); loadPick(); loadChamp(); renderROI(); runSimUI(); runStrat();
+loadHeat(); loadBBG(); loadPick(); loadChamp(); renderROI(); runSimUI(); runStrat(); loadYear();
+setInterval(()=>{ if(!document.hidden) loadYear(); },3600000);
 setInterval(()=>{ if(!document.hidden) runSimUI(); },3600000);
 setInterval(()=>{ if(!document.hidden) loadChamp(); },3600000);
 setInterval(()=>{ if(!document.hidden) loadPick(); },3600000);
