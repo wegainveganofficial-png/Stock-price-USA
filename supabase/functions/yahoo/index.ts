@@ -1,4 +1,4 @@
-// Proxy to Yahoo Finance (chart, symbol search, news, batch quotes) + S&P 500 list (Wikipedia) + market caps + Bloomberg RSS headlines + stock-of-the-day screen + Minervini champion screen for the US Stock Tracker page.
+// Proxy to Yahoo Finance (chart, symbol search, news, batch quotes) + S&P 500 list (Wikipedia) + market caps + Bloomberg RSS headlines + stock-of-the-day screen + Minervini champion screen + daily trading simulator for the US Stock Tracker page.
 // Thai translation of news is done in the browser (translation services block server IPs).
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36';
 const RANGES = new Set(['1d','5d','1mo','3mo','6mo','1y','2y','5y','max']);
@@ -255,6 +255,171 @@ async function champion() {
   return data;
 }
 
+/* ---------- Minervini-style daily trading simulator (closing prices, S&P 500 universe) ---------- */
+const SHORT_ETF: Record<string, { lev: number; stop: number }> = { SH: { lev: 1, stop: 0.08 }, PSQ: { lev: 1, stop: 0.08 }, SQQQ: { lev: 3, stop: 0.15 } };
+const dkey = (s: number) => new Date(s * 1000).toISOString().slice(0, 10);
+async function dailySeries(syms: string[], range: string) {
+  const out: Record<string, { t: number[]; c: (number | null)[] }> = {};
+  const chunks: string[][] = []; for (let i = 0; i < syms.length; i += 20) chunks.push(syms.slice(i, i + 20));
+  for (let i = 0; i < chunks.length; i += 6) {
+    await Promise.all(chunks.slice(i, i + 6).map(async (c) => {
+      const r = await yget(`/v8/finance/spark?symbols=${c.map(encodeURIComponent).join(',')}&range=${range}&interval=1d`);
+      if (!r.ok) return; const j: any = r.j;
+      if (j.spark?.result) { for (const it of j.spark.result) { const res = it.response?.[0]; if (res?.timestamp) out[it.symbol] = { t: res.timestamp, c: res.indicators?.quote?.[0]?.close || [] }; } }
+      else for (const [k, v] of Object.entries<any>(j)) if (Array.isArray(v?.timestamp) && Array.isArray(v?.close)) out[k] = { t: v.timestamp, c: v.close };
+    }));
+  }
+  return out;
+}
+type Ind = { s50: Float64Array; s150: Float64Array; s200: Float64Array; hi: Float64Array; lo: Float64Array; rsv: Float64Array };
+function indicators(a: Float64Array, f: number): Ind {
+  const T = a.length, pre = new Float64Array(T + 1);
+  for (let i = 0; i < T; i++) pre[i + 1] = pre[i] + (i >= f ? a[i] : 0);
+  const sma = (n: number) => { const o = new Float64Array(T).fill(NaN); for (let i = f + n - 1; i < T; i++) o[i] = (pre[i + 1] - pre[i + 1 - n]) / n; return o; };
+  const hi = new Float64Array(T).fill(NaN), lo = new Float64Array(T).fill(NaN), rsv = new Float64Array(T).fill(NaN);
+  const mx: number[] = [], mn: number[] = [];
+  for (let i = f; i < T; i++) {
+    while (mx.length && a[mx[mx.length - 1]] <= a[i]) mx.pop(); mx.push(i); if (mx[0] <= i - 252) mx.shift();
+    while (mn.length && a[mn[mn.length - 1]] >= a[i]) mn.pop(); mn.push(i); if (mn[0] <= i - 252) mn.shift();
+    hi[i] = a[mx[0]]; lo[i] = a[mn[0]];
+    if (i - 252 >= f) rsv[i] = 0.4 * a[i] / a[i - 63] + 0.2 * a[i] / a[i - 126] + 0.2 * a[i] / a[i - 189] + 0.2 * a[i] / a[i - 252];
+  }
+  return { s50: sma(50), s150: sma(150), s200: sma(200), hi, lo, rsv };
+}
+let simData: { t: number; d: any } | null = null;
+async function simUniverse() {
+  if (simData && Date.now() - simData.t < 3600 * 1000) return simData.d;
+  const list = await sp500();
+  const extra = ['SPY', 'QQQ', ...Object.keys(SHORT_ETF)];
+  const raw = await dailySeries([...list.map((m) => m.symbol), ...extra], '2y');
+  if (!raw.SPY || !raw.QQQ) throw new Error('benchmark data unavailable');
+  const dates = raw.SPY.t.map(dkey), T = dates.length, idx = new Map(dates.map((d, i) => [d, i]));
+  const syms: string[] = [], P: Float64Array[] = [], first: number[] = [];
+  for (const [s, v] of Object.entries(raw)) {
+    const a = new Float64Array(T).fill(NaN);
+    v.t.forEach((ts, i) => { const k = idx.get(dkey(ts)); const c = v.c[i]; if (k !== undefined && c != null) a[k] = c; });
+    let f = -1; for (let i = 0; i < T; i++) { if (!isNaN(a[i])) { if (f < 0) f = i; } else if (f >= 0) a[i] = a[i - 1]; }
+    if (f < 0) continue;
+    syms.push(s); P.push(a); first.push(f);
+  }
+  const ind = P.map((a, k) => indicators(a, first[k]));
+  const etf = new Set(extra);
+  const d = { dates, syms, P, first, ind, etf, names: Object.fromEntries(list.map((m) => [m.symbol, m.name])), universe: syms.filter((s) => !etf.has(s)).length, asOf: Date.now() };
+  simData = { t: Date.now(), d };
+  return d;
+}
+type SimOpts = { start: number; capital: number; risk: number; maxPos: number; short: string; shortAlloc: number; strig: string; cost: number };
+function runSim(d: any, o: SimOpts) {
+  const { dates, syms, P, first, ind, etf } = d; const T = dates.length;
+  const at = new Map<string, number>(syms.map((s: string, i: number) => [s, i]));
+  const q = at.get('QQQ')!, spy = at.get('SPY')!;
+  const stocks = syms.map((_: string, k: number) => k).filter((k: number) => !etf.has(syms[k]));
+  let cash = o.capital;
+  type Pos = { k: number; kind: 'long' | 'short'; sh: number; init: number; entry: number; t0: number; stop: number; half: boolean; cost: number; got: number; note: string };
+  const pos = new Map<number, Pos>(); const trades: any[] = []; const cool = new Map<number, number>();
+  const eq: number[] = [], bs: number[] = [], bq: number[] = [], reg: string[] = [], expo: number[] = [];
+  const equityAt = (t: number) => { let v = cash; for (const p of pos.values()) v += p.sh * P[p.k][t]; return v; };
+  const sell = (p: Pos, t: number, sh: number, why: string) => {
+    const px = P[p.k][t], val = sh * px; cash += val - val * o.cost; p.got += val - val * o.cost; p.sh -= sh;
+    if (p.sh <= 0) {
+      pos.delete(p.k); if (why.startsWith('ตัดขาดทุน')) cool.set(p.k, t + 10);
+      trades.push({ sym: syms[p.k], kind: p.kind, d0: dates[p.t0], d1: dates[t], entry: +p.entry.toFixed(2), exit: +px.toFixed(2), pnl: +(p.got - p.cost).toFixed(2), pct: +((p.got / p.cost - 1) * 100).toFixed(2), days: t - p.t0, why, note: p.note });
+    }
+  };
+  const buy = (k: number, t: number, sh: number, kind: 'long' | 'short', stop: number) => {
+    const px = P[k][t], val = sh * px; cash -= val + val * o.cost;
+    pos.set(k, { k, kind, sh, init: sh, entry: px, t0: t, stop, half: false, cost: val + val * o.cost, got: 0, note: '' });
+  };
+  for (let t = o.start; t < T; t++) {
+    // RS rank of the day (1-99)
+    const vals: [number, number][] = []; for (const k of stocks) { const v = ind[k].rsv[t]; if (!isNaN(v)) vals.push([v, k]); }
+    vals.sort((a, b) => a[0] - b[0]); const rank = new Map<number, number>(); vals.forEach(([, k], i) => rank.set(k, Math.max(1, Math.round(((i + 1) / vals.length) * 99))));
+    const qp = P[q][t], q50 = ind[q].s50[t], q200 = ind[q].s200[t];
+    const r = qp > q50 && q50 > q200 ? 'U' : qp < q50 && q50 < q200 ? 'D' : 'N';
+    const shortOn = o.strig === 'fast' ? qp < q50 : r === 'D';
+    // manage open positions
+    for (const p of [...pos.values()]) {
+      const px = P[p.k][t];
+      if (p.kind === 'short') { if (px <= p.stop) sell(p, t, p.sh, 'ตัดขาดทุน ETF ขาลง'); else if (!shortOn) sell(p, t, p.sh, 'ตลาดพ้นขาลง'); continue; }
+      if (px <= p.stop) { sell(p, t, p.sh, p.stop >= p.entry ? 'ขายที่จุดคุ้มทุน/ล็อกกำไร' : 'ตัดขาดทุน'); continue; }
+      const g = px / p.entry - 1;
+      if (g >= 0.10 && p.stop < p.entry) { p.stop = p.entry; }
+      if (g >= 0.20 && !p.half) { p.half = true; p.note = 'ขายครึ่งหนึ่งที่ +20%'; p.stop = Math.max(p.stop, p.entry * 1.05); sell(p, t, Math.floor(p.sh / 2), ''); }
+      if (pos.has(p.k) && p.half && px < ind[p.k].s50[t]) sell(p, t, p.sh, 'หลุด SMA50 หลังทำกำไร');
+    }
+    // inverse ETF hedge in a confirmed downtrend
+    const sk = at.get(o.short);
+    if (sk !== undefined && shortOn && ![...pos.values()].some((p) => p.kind === 'short')) {
+      const px = P[sk][t], e = equityAt(t), sh = Math.floor(Math.min(e * o.shortAlloc, cash / (1 + o.cost)) / px);
+      if (sh > 0) buy(sk, t, sh, 'short', px * (1 - SHORT_ETF[o.short].stop));
+    }
+    // new long breakouts in a confirmed uptrend
+    let longs = [...pos.values()].filter((p) => p.kind === 'long').length;
+    if (r === 'U' && longs < o.maxPos) {
+      const cands: [number, number][] = [];
+      for (const k of stocks) {
+        if (pos.has(k) || (cool.get(k) ?? -1) > t || t - first[k] < 253 || t < 16) continue;
+        const a = P[k], I = ind[k], p = a[t], rk = rank.get(k) ?? 0;
+        if (!(p > I.s150[t] && p > I.s200[t] && I.s150[t] > I.s200[t] && I.s200[t] > I.s200[t - 22] && I.s50[t] > I.s150[t] && I.s50[t] > I.s200[t] && p > I.s50[t] && p >= I.lo[t] * 1.3 && p >= I.hi[t] * 0.75 && rk >= 70)) continue;
+        let piv = -Infinity, mn = Infinity; for (let i = t - 15; i < t; i++) { if (a[i] > piv) piv = a[i]; if (a[i] < mn) mn = a[i]; }
+        if (piv / mn - 1 <= 0.15 && p > piv && p <= piv * 1.05) cands.push([rk, k]);
+      }
+      cands.sort((x, y) => y[0] - x[0]);
+      for (const [, k] of cands) {
+        if (longs >= o.maxPos) break;
+        const a = P[k], px = a[t]; let m10 = Infinity; for (let i = t - 10; i < t; i++) m10 = Math.min(m10, a[i]);
+        const stop = Math.min(Math.max(m10, px * 0.92), px * 0.97), e = equityAt(t);
+        const sh = Math.floor(Math.min(e * o.risk / (px - stop), e * 0.25 / px, cash / (px * (1 + o.cost))));
+        if (sh < 1) continue;
+        buy(k, t, sh, 'long', stop); longs++;
+      }
+    }
+    const e = equityAt(t); let inv = 0; for (const p of pos.values()) inv += p.sh * P[p.k][t];
+    eq.push(+e.toFixed(2)); bs.push(+(o.capital * P[spy][t] / P[spy][o.start]).toFixed(2)); bq.push(+(o.capital * P[q][t] / P[q][o.start]).toFixed(2)); reg.push(r); expo.push(e ? inv / e : 0);
+  }
+  const dd = (a: number[]) => { let pk = -Infinity, m = 0; for (const v of a) { pk = Math.max(pk, v); m = Math.min(m, v / pk - 1); } return +(m * 100).toFixed(2); };
+  const ret = (a: number[]) => +((a[a.length - 1] / o.capital - 1) * 100).toFixed(2);
+  const wins = trades.filter((x) => x.pnl > 0), losses = trades.filter((x) => x.pnl <= 0);
+  const sum = (a: any[], f: string) => a.reduce((s, x) => s + x[f], 0);
+  const last = T - 1;
+  return {
+    dates: dates.slice(o.start), equity: eq, spy: bs, qqq: bq, regime: reg.join(''),
+    stats: {
+      days: eq.length, ret: ret(eq), spyRet: ret(bs), qqqRet: ret(bq), maxDD: dd(eq), spyDD: dd(bs), qqqDD: dd(bq),
+      trades: trades.length, winRate: trades.length ? +(wins.length / trades.length * 100).toFixed(1) : null,
+      avgWin: wins.length ? +(sum(wins, 'pct') / wins.length).toFixed(2) : null, avgLoss: losses.length ? +(sum(losses, 'pct') / losses.length).toFixed(2) : null,
+      profitFactor: losses.length && sum(losses, 'pnl') < 0 ? +(sum(wins, 'pnl') / -sum(losses, 'pnl')).toFixed(2) : null,
+      shortPnl: +sum(trades.filter((x) => x.kind === 'short'), 'pnl').toFixed(2), exposure: +(expo.reduce((a, b) => a + b, 0) / (expo.length || 1) * 100).toFixed(1),
+      cash: +cash.toFixed(2),
+    },
+    open: [...pos.values()].map((p) => ({ sym: syms[p.k], kind: p.kind, d0: dates[p.t0], entry: +p.entry.toFixed(2), price: +P[p.k][last].toFixed(2), sh: p.sh, value: +(p.sh * P[p.k][last]).toFixed(2), pct: +((P[p.k][last] / p.entry - 1) * 100).toFixed(2), stop: +p.stop.toFixed(2), note: p.note })),
+    trades: trades.reverse(),
+  };
+}
+const simCache = new Map<string, { t: number; v: unknown }>();
+async function simulate(u: URL) {
+  const d = await simUniverse();
+  const period = u.searchParams.get('period') || '1y';
+  const short = u.searchParams.get('short') || 'none';
+  const o: SimOpts = {
+    start: 0, capital: Math.min(1e9, Math.max(1000, +(u.searchParams.get('capital') || 100000))),
+    risk: Math.min(0.05, Math.max(0.0025, +(u.searchParams.get('risk') || 1.25) / 100)),
+    maxPos: Math.min(12, Math.max(1, Math.round(+(u.searchParams.get('maxpos') || 6)))),
+    short: SHORT_ETF[short] ? short : 'none', shortAlloc: Math.min(1, Math.max(0, +(u.searchParams.get('salloc') || 30) / 100)), strig: u.searchParams.get('strig') === 'confirmed' ? 'confirmed' : 'fast', cost: 0.001,
+  };
+  const T = d.dates.length, PAPER = '2026-11-27';
+  if (period === 'paper') {
+    const i = d.dates.findIndex((x: string) => x >= PAPER);
+    if (i < 0) return { pending: true, paperStart: PAPER, lastDate: d.dates[T - 1], universe: d.universe };
+    o.start = i;
+  } else o.start = Math.max(253, T - (({ '3m': 63, '6m': 126, '1y': 252 } as Record<string, number>)[period] ?? 252));
+  const key = JSON.stringify(o) + d.asOf;
+  const c = simCache.get(key); if (c) return c.v;
+  const v = { ...runSim(d, o), params: { ...o, period, risk: o.risk * 100, shortAlloc: o.shortAlloc * 100 }, universe: d.universe, asOf: d.asOf, paperStart: PAPER };
+  if (simCache.size > 50) simCache.clear(); simCache.set(key, { t: Date.now(), v });
+  return v;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   const u = new URL(req.url);
@@ -281,6 +446,10 @@ Deno.serve(async (req) => {
     if (!BBG[feed]) return json({ error: 'unknown feed' }, 400);
     try { return json({ feed, items: await bloomberg(feed) }, 200, { 'Cache-Control': 'max-age=300' }); }
     catch (e) { return json({ error: (e as Error).message, items: [] }, 502); }
+  }
+  if (type === 'sim') {
+    try { return json(await simulate(u), 200, { 'Cache-Control': 'max-age=600' }); }
+    catch (e) { return json({ error: (e as Error).message }, 502); }
   }
   if (type === 'champion') {
     try { return json(await champion(), 200, { 'Cache-Control': 'max-age=900' }); }

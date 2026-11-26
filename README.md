@@ -11,6 +11,8 @@
 - Heat map S&P 500 (ขนาดตามมูลค่าตลาด สีตาม % เปลี่ยนแปลง แยกตามกลุ่มอุตสาหกรรม)
 - หัวข่าว Bloomberg (RSS สาธารณะ) แปลไทย
 - Champion Screen: Trend Template 8 ข้อของ Mark Minervini + RS rating + VCP (ประมาณการ) + ตัวคำนวณจุดตัดขาดทุนและขนาดไม้
+- จำลองการเทรดรายวันสไตล์ Minervini (Think & Trade Like a Champion): ย้อนหลัง 3/6/12 เดือน และ paper trade เริ่ม 27 พ.ย. 2026 เทียบ SPY/QQQ พร้อมตัวเลือก ETF ขาลง SH/PSQ/SQQQ
+- แท็บ ETF ขาลง (Inverse): SH, PSQ, DOG, RWM, SDS, QID, SPXU, SQQQ
 - หุ้นเด่นประจำวัน: สัญญาณทางเทคนิคจากการคัดกรอง S&P 500 ตามกฎที่เปิดเผย (ไม่ใช่คำแนะนำการลงทุน)
 
 ## แหล่งข้อมูล (ฟรี ไม่ต้องใช้ API key)
@@ -28,7 +30,7 @@
 
 ```
 index.html                        หน้าเว็บ (static) — เปิดตรงหรือ deploy ที่ใดก็ได้
-supabase/functions/yahoo/index.ts Edge Function: ?type=chart|search|news|quotes|sp500|caps|bloomberg|pick|champion
+supabase/functions/yahoo/index.ts Edge Function: ?type=chart|search|news|quotes|sp500|caps|bloomberg|pick|champion|sim
 ```
 
 Supabase project: `vyutsvlusxyuoqjxxusi` (Stock Price) — หน้าเว็บใช้ anon key ซึ่งเป็น public key ตามปกติของ Supabase
