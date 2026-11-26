@@ -1006,10 +1006,13 @@ function renderROI(){
   if (!sim){ $('#rmine').innerHTML = `<div><span>ระบบของคุณ</span><b>รอผลจำลอง</b><span>เลือกช่วง “ย้อนหลัง” ในการ์ดจำลองเพื่อใช้อัตราชนะจริง</span></div>`; return; }
   const W = sim.winRate/100, G = (sim.avgWin||0)/100, L = Math.abs(sim.avgLoss||0)/100, Ra = L ? G/L : null;
   const lo = Ra ? optLoss(W, Ra) : null, lr = optLoss(W, R);
-  const sugg = Math.min(15, Math.max(3, Math.round((lr>0?lr:0.03)*100)));
+  // use the system's real G/L ratio when it gives a positive optimum, else the table ratio
+  const useR = lo!=null && lo>0 ? Ra : (lr>0 ? R : null), useL = lo!=null && lo>0 ? lo : lr;
+  const sugg = useR ? Math.min(15, Math.max(3, Math.round(useL*100))) : null, suggTp = useR ? Math.min(100, Math.max(4, Math.round(sugg*useR))) : null;
   $('#rmine').innerHTML = `<div><span>ผลจำลองจริง (${esc(SIM.dates[0])} → ${esc(SIM.dates.at(-1))})</span><b>ชนะ ${sim.winRate.toFixed(1)}% · กำไร ${pcs(sim.avgWin)} / ขาดทุน ${pcs(sim.avgLoss)}</b><span>G/L Ratio จริง ${Ra?Ra.toFixed(2)+':1':'–'} · Stop สูงสุดที่ใช้ ${SIM.params.stop}% · ขายครึ่งที่ +${SIM.params.tp}%</span></div>`
     + `<div><span>ROI ${n} ไม้ ด้วยค่าเฉลี่ยจริง</span><b class="${sgn(Ra?roiOf(W,G,L,n):0)}">${Ra?f2(roiOf(W,G,L,n)):'–'}</b><span>${lo!=null&&lo>0?`ด้วย G/L ${Ra.toFixed(2)}:1 ขาดทุนเฉลี่ยที่เหมาะ ≈ ${(lo*100).toFixed(1)}% (ตอนนี้ ${(L*100).toFixed(1)}%)`:'ระบบยังไม่ทำกำไรด้วยค่าเฉลี่ยนี้'}</span></div>`
-    + `<div><span>ลองในการจำลอง (G/L ${+R.toFixed(2)}:1 ตามตาราง)</span><b>Stop ${sugg}% · ขายครึ่งที่ +${Math.round(sugg*R)}%</b><button type="button" class="btn2" id="rapply" data-l="${sugg}" data-g="${Math.round(sugg*R)}" style="margin-top:6px">ใช้ค่านี้ในการจำลอง</button></div>`;
+    + (useR ? `<div><span>ลองในการจำลอง (G/L ${useR.toFixed(2)}:1 ${useR===Ra?'ตามผลจริง':'ตามตาราง'})</span><b>Stop ${sugg}% · ขายครึ่งที่ +${suggTp}%</b><button type="button" class="btn2" id="rapply" data-l="${sugg}" data-g="${suggTp}" style="margin-top:6px">ใช้ค่านี้ในการจำลอง</button></div>`
+      : `<div><span>ลองในการจำลอง</span><b class="dnc">ยังไม่มีจุดที่เหมาะ</b><span>ความแม่นยำ ${sim.winRate.toFixed(1)}% ต้องการ G/L Ratio มากกว่า ${((1-W)/W).toFixed(2)}:1 จึงจะทำกำไรได้</span></div>`);
 }
 function applyStop(l, g){
   $('#s_stop').value = l; $('#s_tp').value = Math.round(g); store.set('sstop', l); store.set('stp', Math.round(g));
